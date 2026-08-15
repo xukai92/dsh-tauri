@@ -67,54 +67,35 @@ export const Config: z<ConnectionConfig> = z.object({
 })
 
 /**
- * Methods gated to loopback even on a trusted-host deployment. Native dialogs
- * act on the host machine; the settings and credential domains mutate the
- * user's configuration and secret store, and READING them is equally
- * privileged — `settings.describe` returns every exposed namespace's
- * configuration and `credentials.describe` reports whether an arbitrary
- * environment-variable name is configured and where from, which is
- * reconnaissance no anonymous caller should have. `trustedHosts` is a
- * DNS-rebinding fence, explicitly not authentication, so the whole
- * configuration plane stays loopback-same-origin until a real authentication
- * layer exists. `llm.discoverModels` belongs to that plane on both counts: it
- * carries a draft credential, and it makes the HOST issue a GET to a URL the
- * caller chose and reports back the status or the parsed body — an anonymous
- * LAN caller would have a probe for whatever the host can reach and the
- * browser cannot.
+ * Methods that stay loopback-only even on a trusted-host deployment: they
+ * drive the host machine's own desktop (native directory/editor dialogs) or
+ * issue a host-side probe, none of which a remote browser can use. The
+ * settings and credential domains are deliberately NOT here — a
+ * `--trusted-host` deployment has already declared the network it serves, so
+ * the configuration plane follows that same fence. Exposing settings and
+ * credentials to a trusted authority is the operator's own exposure decision,
+ * the same one they already made by trusting that authority for `session.create`
+ * (which runs tools as this process). Loopback remains the safe default;
+ * `--host 0.0.0.0 --trusted-host <x>` is the explicit opt-in.
  *
- * The model catalog (`llm.providers`, `llm.models`) is deliberately NOT here:
- * it carries provider ids, display names, and model lists — no endpoints,
- * keys, or key state — and a LAN client's model picker legitimately needs it.
+ * The model catalog (`llm.providers`, `llm.models`) is also NOT here: it
+ * carries provider ids, display names, and model lists — no endpoints, keys,
+ * or key state — and a LAN client's model picker legitimately needs it.
  */
-const PRIVILEGED_METHODS = new Set([
+const LOOPBACK_ONLY_METHODS = new Set([
   // A preset composition names the plugins a session runs, so reading one is
   // reconnaissance; copy and remove rearrange what the deployment offers, and
-  // openDocument drives the host desktop — all more than the roster beside
-  // them. (Authoring is copy-only, so no method here accepts composition text
-  // or a path; the pin is about who may manage the roster at all.)
-  //
-  // CHOOSING one is not pinned, and `agentPreset.list` is not either. Picking a
-  // preset looks like escalation — one of them mounts the toolset that edits the
-  // live runtime — but `session.create` already takes an `agentPreset`, so
-  // pinning only the switch would leave the same capability one method over.
-  // The deeper reason is that the capability is not the preset's to grant: the
-  // deployment's own default already carries `bash` and the filesystem tools, so
-  // any caller that may start a session at all can already run commands as this
-  // process. Pinning the switch would be a fence beside an open gate.
+  // openDocument drives the host desktop. CHOOSING one is not pinned, and
+  // `agentPreset.list` is not either — `session.create` already takes an
+  // `agentPreset`, and any caller that may start a session can already run
+  // commands as this process.
   'agentPreset.read',
   'agentPreset.copy',
   'agentPreset.openDocument',
   'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
-  'settings.describe',
   'settings.openDocument',
-  'settings.update',
-  'settings.replace',
-  'settings.mutate',
-  'credentials.describe',
-  'credentials.set',
-  'credentials.unset',
   'llm.discoverModels',
 ])
 
@@ -122,8 +103,8 @@ const PRIVILEGED_METHODS = new Set([
  * Mounts the API gateway under the browser transport prefix. Every request on
  * the prefix passes the browser-trust fence first (DNS-rebinding and
  * cross-site defense — [api-request-trust](./api-request-trust.ts));
- * privileged methods additionally pass it with an empty trust list, which
- * pins them to loopback.
+ * {@link LOOPBACK_ONLY_METHODS} additionally pass that fence with an empty
+ * trust list, which pins them to loopback.
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
  */
@@ -143,7 +124,7 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
         ? pathname.slice(API_PATH.length + 1)
         : undefined
       if (method !== undefined
-        && PRIVILEGED_METHODS.has(method)
+        && LOOPBACK_ONLY_METHODS.has(method)
         && !isTrustedApiRequest(request, [])) {
         return new Response('forbidden', { status: 403 })
       }

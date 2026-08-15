@@ -49,7 +49,7 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
   /**
    * @param api - settings wire face.
    * @param spec - namespace identity and optional narrowing decoder.
-   * @param persistence - remote browsers remain process-local because settings RPCs are loopback-only.
+   * @param persistence - 'memory' keeps a caller process-local without Host calls; the shipped binder always uses 'host'.
    */
   constructor(
     private readonly api: SettingsFace,
@@ -163,9 +163,14 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     try {
       response = await this.api.settings.describe({})
     } catch (_settingsReadFailure) {
+      this.failRead(generation)
       return
     }
-    if (!response.result.ok || this.disposed) return
+    if (this.disposed) return
+    if (!response.result.ok) {
+      this.failRead(generation)
+      return
+    }
     const { namespaces, writable } = response.result.value
     const view = namespaces.find(candidate => candidate.ns === this.spec.namespace)
     const publish = generation === this.readGeneration
@@ -179,6 +184,20 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
       return
     }
     this.accept(view, publish, writable)
+  }
+
+  /**
+   * Handle a read that the transport or fence refused. Only the first read may
+   * publish `unavailable` (there is no value yet); a later transient failure
+   * keeps the last good value instead of erasing it.
+   */
+  private failRead(generation: number): void {
+    if (generation !== this.readGeneration) return
+    if (this.store.getSnapshot().value !== undefined) return
+    this.store.update((draft) => {
+      draft.status = 'unavailable'
+      draft.writable = false
+    })
   }
 
   private accept(view: SettingsNamespaceView, publish: boolean, writable?: boolean): void {
@@ -245,11 +264,7 @@ export class SettingsScopeBinder extends Service {
   bind<T>(spec: SettingsScopeSpec<T>): SettingsScope<T> {
     const ctx = this.ctx
     const connection = ctx.get('connection') as ConnectionHandle
-    const controller = new SettingsScopeController<T>(
-      connection.api,
-      spec,
-      connection.isLoopback ? 'host' : 'memory',
-    )
+    const controller = new SettingsScopeController<T>(connection.api, spec)
     ctx.effect(() => {
       const refresh = (namespace?: string): void => {
         if (namespace !== undefined && namespace !== spec.namespace) return

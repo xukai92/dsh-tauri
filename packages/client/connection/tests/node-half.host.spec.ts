@@ -161,17 +161,14 @@ describe('connection node half', () => {
     await dispose()
   })
 
-  it('pins privileged methods to loopback even for a declared trusted authority', async () => {
+  it('pins desktop and probe methods to loopback even for a declared trusted authority', async () => {
     const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
-    // The privileged set: native dialogs plus the whole settings/credential
-    // configuration plane, reads included, plus the one method that makes the
-    // host fetch a caller-chosen URL. The same declared authority reaches
-    // ordinary reads (carrier-level 404 from the empty proxy proves the fence
-    // passed), but each privileged method stays loopback-only and 403s.
+    // Desktop operations (native dialogs, host-side openers) and the one
+    // host-side probe stay loopback-only: a declared authority cannot drive
+    // the host machine's own desktop or fetch a caller-chosen URL. The
+    // settings/credential plane is NOT here — it follows the declared authority.
     for (const method of [
-      'host.pickDirectory', 'host.openPath',
-      'settings.describe', 'settings.openDocument', 'settings.update', 'settings.replace', 'settings.mutate',
-      'credentials.describe', 'credentials.set', 'credentials.unset',
+      'host.pickDirectory', 'host.openPath', 'settings.openDocument',
       'llm.discoverModels',
       // A composition names the plugins a session runs: reading one is
       // reconnaissance, and copy/remove/openDocument manage the roster and
@@ -186,6 +183,16 @@ describe('connection node half', () => {
       expect(denied.state.status).toBe(403)
       expect(denied.state.body).toBe('forbidden')
     }
+    // The configuration plane follows the declared authority: an empty proxy
+    // answers carrier-level 404 (the fence passed) rather than 403.
+    for (const method of [
+      'settings.describe', 'settings.update', 'settings.replace', 'settings.mutate',
+      'credentials.describe', 'credentials.set', 'credentials.unset',
+    ]) {
+      const read = fakeResponse()
+      await routes[0]!.handler(fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`), read.response)
+      expect(read.state.status).toBe(404)
+    }
     const read = fakeResponse()
     await routes[0]!.handler(fakeRequest({ host: 'harness.example' }), read.response)
     expect(read.state.status).not.toBe(403)
@@ -199,8 +206,8 @@ describe('connection node half', () => {
     const loopback = fakeResponse()
     await routes[0]!.handler(fakeRequest({ host: '127.0.0.1:3080' }), loopback.response)
     expect(loopback.state.status).toBe(404)
-    // An all-interfaces composition derives port-less LAN IP literals, which
-    // pass markerless curl on any port.
+    // LAN authority declared as a port-less IP literal — the shape the CLI
+    // derives for `--host 0.0.0.0` — passes markerless curl on any port.
     const lan = fakeResponse()
     await routes[0]!.handler(fakeRequest({ host: '192.168.1.5:3080' }), lan.response)
     expect(lan.state.status).toBe(404)
@@ -453,7 +460,7 @@ describe('connection node half over a real HTTP server', () => {
     })
   }
 
-  it('answers a declared LAN authority with 403 on every configuration method, over real HTTP', async () => {
+  it('answers a declared LAN authority: desktop methods 403, configuration passes, over real HTTP', async () => {
     // The fence's input is a real IncomingMessage parsed by Node from the
     // wire, not a hand-assembled object: the Host header a LAN browser sends
     // is exactly what decides loopback-only here, so the boundary is asserted
@@ -461,11 +468,10 @@ describe('connection node half over a real HTTP server', () => {
     const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
     const { port, close } = await serve(routes)
     try {
-      // Reads are as privileged as writes: describe returns the exposed
-      // configuration, and credentials.describe probes arbitrary env-var names.
+      // Desktop operations and the host-side probe stay loopback-only over a
+      // declared LAN authority.
       for (const method of [
-        'settings.describe', 'settings.openDocument', 'settings.update', 'settings.replace', 'settings.mutate',
-        'credentials.describe', 'credentials.set', 'credentials.unset',
+        'settings.openDocument',
         'host.pickDirectory', 'host.openPath',
         // Carries a draft credential and turns the host into a fetcher for a
         // URL the caller picked: an anonymous LAN caller must not reach it.
@@ -473,6 +479,14 @@ describe('connection node half over a real HTTP server', () => {
         'agentPreset.read', 'agentPreset.copy', 'agentPreset.openDocument', 'agentPreset.remove',
       ]) {
         expect([method, await call(port, method, 'harness.example')]).toEqual([method, 403])
+      }
+      // The configuration plane follows the declared authority (404 is the
+      // empty proxy's carrier answer — the fence passed).
+      for (const method of [
+        'settings.describe', 'settings.update', 'settings.replace', 'settings.mutate',
+        'credentials.describe', 'credentials.set', 'credentials.unset',
+      ]) {
+        expect([method, await call(port, method, 'harness.example')]).toEqual([method, 404])
       }
       // The model catalog stays reachable for the same authority: a LAN
       // client's model picker needs it, and it carries no key or endpoint

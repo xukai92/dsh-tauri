@@ -180,8 +180,23 @@ export function createMessage<T extends NewMessage>(
 ): T & Pick<Message, 'id'> {
   return freezeMessage({
     ...input,
-    id: MessageId(crypto.randomUUID()),
+    id: MessageId(randomUuid()),
   })
+}
+
+/**
+ * UUID v4 without `crypto.randomUUID`, which browsers gate to secure contexts
+ * (absent over plain-HTTP LAN/Tailscale origins). This module is inlined into
+ * browser client bundles, so message identity must not depend on that API.
+ * @returns a version-4 UUID string.
+ */
+function randomUuid(): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  view.setUint8(6, (view.getUint8(6) & 0x0f) | 0x40)
+  view.setUint8(8, (view.getUint8(8) & 0x3f) | 0x80)
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 /**

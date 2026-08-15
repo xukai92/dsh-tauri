@@ -402,8 +402,10 @@ describe('SettingsScopeBinder.bind', () => {
     expect(describeCall).toHaveBeenCalledTimes(3)
   })
 
-  it('binds a remote browser in memory mode without starting a settings read', async () => {
-    const describeCall = vi.fn()
+  it('degrades a bound scope to unavailable when the Host read is refused', async () => {
+    // A trusted-host browser reads settings normally; an untrusted one is
+    // refused by the fence and the scope must surface 'unavailable', not hang.
+    const describeCall = vi.fn(() => Promise.reject(new Error('forbidden')))
     const ctx = new Context()
     ctx.provide('connection', {
       api: { settings: { describe: describeCall } },
@@ -419,8 +421,8 @@ describe('SettingsScopeBinder.bind', () => {
       },
     })
     await fiber.await()
-    expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', mode: 'memory', writable: false })
+    await vi.waitFor(() => { expect(describeCall).toHaveBeenCalled() })
+    expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', writable: false })
     await fiber.dispose()
-    expect(describeCall).not.toHaveBeenCalled()
   })
 })
