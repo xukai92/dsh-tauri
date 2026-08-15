@@ -3,12 +3,15 @@ name: Build Tauri macOS
 # Build and upload the macOS desktop shell (apps/tauri). The .app/.dmg
 # bundling, ad-hoc code signing, and icon.icns handling are macOS-only steps,
 # so this runs on macOS runners; the Rust itself also compiles on Linux
-# (see apps/tauri/README.md). Run manually or on PRs touching the shell.
+# (see apps/tauri/README.md). Runs on push or PR touching the shell, or manually.
 on:
-  workflow_dispatch:
+  push:
+    paths:
+      - 'apps/tauri/**'
   pull_request:
     paths:
       - 'apps/tauri/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
