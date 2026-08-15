@@ -272,7 +272,8 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // landed mid-setup. Watching is unconditional: a one-shot surface exits
   // through its bounded shutdown, which disposes the watchers before the
   // loop drains.
-  if (!signalShutdown.signal.aborted
+  if (options.bareModuleBaseUrl === undefined
+    && !signalShutdown.signal.aborted
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
     try {

@@ -389,6 +389,7 @@ class SidecarBuild {
     await this.prepareNativePty(target)
     if (!this.cli.dryRun) await mkdir(this.outDir, { recursive: true })
     await this.run(`pkg ${target.spec}`, pnpmBin(), [
+      '--config.verify-deps-before-run=false',
       'dlx',
       PKG_SPEC,
       this.staging,
@@ -400,6 +401,20 @@ class SidecarBuild {
     ])
     if (!this.cli.dryRun && !existsSync(product)) {
       throw new Error(`build-tauri-sidecar: product ${product} is missing after the pkg run; inspect ${this.outDir}.`)
+    }
+    // Sharp's .node dlopens libvips from a sibling package via RPATH, which
+    // pkg's flat VFS extraction cannot satisfy. Emit the shared libraries
+    // beside the exe; the spawning shell sets LD_LIBRARY_PATH (Linux) or
+    // DYLD_LIBRARY_PATH (macOS) to this directory.
+    const sharpOs = target.platform === 'macos' ? 'darwin' : 'linux'
+    const libvipsSrc = join(this.staging, 'node_modules', '@img', `sharp-libvips-${sharpOs}-${target.arch}`, 'lib')
+    const libvipsDir = join(this.outDir, `sharp-libs-${target.tauriTriple}`)
+    if (this.cli.dryRun) {
+      console.log(`build-tauri-sidecar: [dry-run] cp ${libvipsSrc}/* ${libvipsDir}/`)
+    } else if (existsSync(libvipsSrc)) {
+      await mkdir(libvipsDir, { recursive: true })
+      await cp(libvipsSrc, libvipsDir, { recursive: true })
+      console.log(`build-tauri-sidecar: emitted sharp libvips to ${libvipsDir}`)
     }
     if (target.platform !== 'macos') return [product]
     const spawnHelper = `${product}-spawn-helper`

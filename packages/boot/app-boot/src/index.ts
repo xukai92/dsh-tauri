@@ -766,7 +766,11 @@ export async function boot(
   // so its failure is host setup, not the plugin tree.
   let stage = 'host preparation failed'
   try {
-    ctx.baseUrl = pathToFileURL(dirname(absoluteConfigPath)).href + '/'
+    // When a packaged host supplies its own base (the VFS location of the
+    // packaged entry), it becomes the Loader's base for BOTH the root include
+    // and dynamic `loader.create` entries, so every bare plugin name resolves
+    // from the closed runtime instead of the profile's `$DSH_HOME` node_modules.
+    ctx.baseUrl = bareModuleBaseUrl ?? pathToFileURL(dirname(absoluteConfigPath)).href + '/'
     ctx.provide('dshHomePath', dshHomePath)
     await ctx.plugin(Loader)
     await prepare?.(ctx)
