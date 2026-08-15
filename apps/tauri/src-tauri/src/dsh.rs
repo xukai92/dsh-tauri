@@ -44,8 +44,13 @@ fn resolve_bin() -> PathBuf {
 /// satisfy, so the spawn sets the dynamic-library search path to this directory.
 fn sharp_libs_dir() -> Option<PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    // Tauri maps a `..` in a resource path to a `_up_` directory inside
+    // Resources, so `../binaries/sharp-libs` lands at `_up_/binaries/sharp-libs`.
     let candidates = if cfg!(target_os = "macos") {
-        vec![exe_dir.join("../Resources").join("sharp-libs")]
+        vec![
+            exe_dir.join("../Resources").join("sharp-libs"),
+            exe_dir.join("../Resources/_up_/binaries/sharp-libs"),
+        ]
     } else {
         vec![
             exe_dir.join("sharp-libs"),
