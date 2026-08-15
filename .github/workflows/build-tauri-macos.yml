@@ -54,7 +54,7 @@ jobs:
 
       - name: Build the Tauri app
         working-directory: apps/tauri
-        run: pnpm tauri build
+        run: pnpm --config.verify-deps-before-run=false tauri build
 
       - name: Upload macOS bundle
         uses: actions/upload-artifact@v4

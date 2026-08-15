@@ -13,13 +13,20 @@ changes and there is no Tauri IPC bridge.
 
 ## How it works
 
-1. `run()` spawns `dsh --profile web --port 0` (`DSH_BIN` overrides the binary;
-   `--port 0` lets the OS pick a free port so two shells never collide).
+1. `run()` spawns the bundled `dsh-web` sidecar — a single-file exe built by
+   `scripts/build-tauri-sidecar.ts` (`@yao-pkg/pkg --sea` over the web profile's
+   closure) and embedded via Tauri `externalBin` — with `--profile web --port 0`
+   (`--port 0` lets the OS pick a free port so two shells never collide).
+   `DSH_BIN` overrides the binary for development.
 2. A worker thread reads the host's stdout until it finds the readiness line
    `dsh web: http://127.0.0.1:<port>`, then parses the port.
 3. A `WebviewWindowBuilder` opens window `main` on that external URL.
 4. The child process is held in Tauri managed state and killed on drop, so
    quitting the shell tears the host down with it.
+
+The shell also sets `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH` to the bundled
+`sharp-libs` resource, so `sharp`'s native addon can `dlopen` libvips (pkg's
+VFS cannot satisfy its RPATH).
 
 See `src-tauri/src/dsh.rs` for the supervisor and URL parser (with unit
 tests), and `src-tauri/src/lib.rs` for the wiring.
@@ -31,9 +38,6 @@ tests), and `src-tauri/src/lib.rs` for the wiring.
 - **Rust** 1.77.2+ (`rustup`).
 - **Tauri CLI** — either `pnpm` (the `@tauri-apps/cli` devDependency) or
   `cargo install tauri-cli`.
-- **`dsh` on `PATH`** — an installed build whose web frontend dist is present
-  (e.g. `pnpm build` in this repo, or a published `dsh`). Or set `DSH_BIN` to
-  an explicit path.
 
 ## Run (development)
 
@@ -44,22 +48,27 @@ pnpm tauri dev          # or: cargo tauri dev
 ```
 
 The window opens on the served GUI. `dsh`'s stderr is inherited, so host
-diagnostics appear in your terminal.
+diagnostics appear in your terminal. In dev the sidecar is not bundled, so
+`DSH_BIN` (or `dsh` on `PATH`) is used.
 
 ## Build the macOS app
 
 ```sh
-pnpm tauri build        # or: cargo tauri build
+node --import tsx/esm scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
+pnpm tauri build        # from apps/tauri
 ```
 
-Produces `src-tauri/target/release/bundle/macos/DeepSeek Harness.app` and a
-`.dmg`. Note: building the `.app`/`.dmg` requires macOS (bundling, code signing,
-and `icon.icns` are macOS-only steps); `cargo check`/`cargo build` of the Rust
+The first step builds the `dsh-web` sidecar and emits its sharp libvips
+libraries into `apps/tauri/binaries/`; `tauri build` then bundles both. Produces
+`src-tauri/target/release/bundle/macos/DeepSeek Harness.app` and a `.dmg`. Note:
+building the `.app`/`.dmg` requires macOS (bundling, code signing, and
+`icon.icns` are macOS-only steps); `cargo check`/`cargo build` of the Rust
 itself works on Linux with the WebKitGTK 4.1 dev packages installed.
 
 ## Configuration
 
-- `DSH_BIN` — path to the `dsh` binary to spawn (default: `dsh` on `PATH`).
+- `DSH_BIN` — override the binary to spawn (default: the bundled `dsh-web`
+  sidecar, then `dsh` on `PATH`).
 - Everything else (API key, `DSH_HOME`, `--host`, …) is dsh's own
   configuration and passes through the inherited environment. An
   `DEEPSEEK_API_KEY` is only needed to actually run an agent; the GUI opens
@@ -67,9 +76,11 @@ itself works on Linux with the WebKitGTK 4.1 dev packages installed.
 
 ## Known limitations and next steps
 
-- **No sidecar bundling yet.** `dsh` must already be installed on the target
-  machine; the app does not embed it. Next step is bundling the single-exe
-  `dsh` as a Tauri `externalBin` sidecar for a self-contained `.app`.
+- **Single-file exe, plus one shared library.** The sidecar itself is one
+  file, but `sharp` (image attachments) needs its libvips libraries shipped
+  beside it (`apps/tauri/binaries/sharp-libs`), because pkg's VFS cannot
+  satisfy the `.node` RPATH. Node-pty's macOS `spawn-helper` needs the same
+  treatment for persistent terminals.
 - **Loopback HTTP, no IPC bridge.** We use the same `http://127.0.0.1:<port>`
   transport a browser uses. If the shell later needs to load `dist/` over
   `file://`, the host's `FetchHandler`/`AbstractApiClient.doFetch` seams are
