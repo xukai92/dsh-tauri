@@ -26,7 +26,8 @@ import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
@@ -308,7 +309,20 @@ export class ClientModuleRegistry extends Service {
       throw new Error('client-modules: ctx.baseUrl is unset — the node half needs the config-tree anchor to resolve plugin packages')
     }
     const require = createRequire(ctx.baseUrl)
-    this.resolvePkgJson = spec => require.resolve(`${spec}/package.json`)
+    this.resolvePkgJson = (spec) => {
+      try {
+        return require.resolve(`${spec}/package.json`)
+      } catch (error) {
+        // Packaged VFS: CJS resolution cannot see /snapshot paths. The deployed
+        // closure is one flat node_modules, so derive the path from this
+        // module's own VFS location. Only bare package names resolve this way;
+        // builtins (cordis:*) and subpath entries (…/startup) stay non-rows.
+        if (spec.includes(':') || !/^(@[^/]+\/)?[^/]+$/.test(spec)) throw error
+        let dir = dirname(fileURLToPath(import.meta.url))
+        while (basename(dir) !== 'node_modules' && dir !== dirname(dir)) dir = dirname(dir)
+        return join(dir, spec, 'package.json')
+      }
+    }
 
     // Subscribe before seeding so a fiber arriving mid-activation lands in the
     // same dirty set (Set idempotence makes the overlap harmless). An entry-less
