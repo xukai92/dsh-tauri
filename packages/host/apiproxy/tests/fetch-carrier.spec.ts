@@ -803,3 +803,21 @@ describe('resolveBase', () => {
     }
   })
 })
+
+describe('mintRpcId without a secure context', () => {
+  it('mints a UUID v4 from getRandomValues when crypto.randomUUID is absent', async () => {
+    // Non-secure origins (plain-HTTP LAN/Tailscale) expose getRandomValues but
+    // not randomUUID; minting must not depend on the secure-context API.
+    vi.stubGlobal('crypto', {
+      getRandomValues(bytes: Uint8Array) {
+        return bytes.fill(0)
+      },
+    })
+    try {
+      const response = await client().sessions.list({})
+      expect(response.rpcId).toBe('00000000-0000-4000-8000-000000000000')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})

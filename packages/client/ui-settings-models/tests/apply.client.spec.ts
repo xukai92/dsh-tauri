@@ -13,6 +13,7 @@ import {
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
+import { WELCOME_NOTICE_SETTINGS_NAMESPACE } from '../src/onboarding-copy.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -153,9 +154,34 @@ describe('ui-settings-models apply', () => {
     expect(() => b.locale.register('settings.models', 'en', {})).not.toThrow()
   })
 
-  it('keeps remote-browser acknowledgement in process memory', async () => {
+  it('loads the welcome acknowledgement from Host settings for a remote browser', async () => {
     const b = await bench(false)
     declare(b.slots)
+    // The welcome store always reads its namespace from Host settings; a
+    // remote (trusted-host) browser reaches it the same as loopback.
+    ;(b.ctx.get('connection') as { api: { settings: { describe: unknown } } }).api = {
+      settings: {
+        describe: () => Promise.resolve({
+          rpcId: 'r',
+          result: {
+            ok: true as const,
+            value: {
+              writable: true,
+              hasDocument: true,
+              namespaces: [{
+                ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
+                schema: { uid: 0, refs: {} },
+                value: {},
+                base: {},
+                applies: 'live',
+                secrets: [],
+                revision: 0,
+              }],
+            },
+          },
+        }),
+      },
+    } as never
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')
       .find(candidate => candidate.options.id === 'welcome-notice')!

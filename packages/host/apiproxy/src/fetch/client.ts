@@ -69,6 +69,21 @@ import {
 } from '../api/subagents.schema.ts'
 
 /**
+ * UUID v4 without `crypto.randomUUID`, which browsers gate to secure contexts
+ * (absent over plain-HTTP LAN/Tailscale origins). `crypto.getRandomValues` is
+ * exposed on every origin, so rpcId minting must not depend on the secure-context API.
+ * @returns a version-4 UUID string.
+ */
+function randomUuid(): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  view.setUint8(6, (view.getUint8(6) & 0x0f) | 0x40)
+  view.setUint8(8, (view.getUint8(8) & 0x3f) | 0x80)
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+/**
  * Client consumption face of the contract (shape a): same domain tree as ApiProxy, but unary
  * methods take the business payload directly — the carrier mints the rpcId and wraps the
  * envelope. Business code needing the call's rpcId reads it from the RpcResponse echo.
@@ -296,8 +311,9 @@ export abstract class AbstractApiClient implements IApiClient {
   }
 
   protected mintRpcId(): RpcId {
-    // crypto.randomUUID is a Web API (browser + Node ≥19): keeps this base platform-neutral.
-    return RpcId(crypto.randomUUID())
+    // randomUuid() (not crypto.randomUUID): the latter is gated to secure
+    // contexts, so a plain-HTTP LAN/Tailscale origin would fail every RPC here.
+    return RpcId(randomUuid())
   }
 
   /**
