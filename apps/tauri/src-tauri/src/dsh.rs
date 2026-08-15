@@ -11,6 +11,7 @@
 //! on drop, so quitting the shell tears the host down with it.
 
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::channel;
 use std::time::Duration;
@@ -22,9 +23,36 @@ const READY_TIMEOUT: Duration = Duration::from_secs(30);
 /// so two shells never collide; the actual URL comes from the readiness line.
 const DSH_ARGS: [&str; 4] = ["--profile", "web", "--port", "0"];
 
-/// The `dsh` binary to spawn; `DSH_BIN` overrides the PATH lookup.
-fn dsh_bin() -> String {
-    std::env::var("DSH_BIN").unwrap_or_else(|_| "dsh".to_owned())
+/// Resolve the host binary: the bundled Tauri sidecar (`dsh-web` beside this
+/// executable), else `DSH_BIN`, else `dsh` on `PATH`.
+fn resolve_bin() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let sidecar = dir.join("dsh-web");
+            if sidecar.is_file() {
+                return sidecar;
+            }
+        }
+    }
+    std::env::var_os("DSH_BIN")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("dsh"))
+}
+
+/// The emitted sharp libvips directory, bundled as a resource next to the app.
+/// Sharp's `.node` dlopens libvips via an RPATH that pkg's flat VFS cannot
+/// satisfy, so the spawn sets the dynamic-library search path to this directory.
+fn sharp_libs_dir() -> Option<PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let candidates = if cfg!(target_os = "macos") {
+        vec![exe_dir.join("../Resources").join("sharp-libs")]
+    } else {
+        vec![
+            exe_dir.join("sharp-libs"),
+            exe_dir.join("../lib").join("sharp-libs"),
+        ]
+    };
+    candidates.into_iter().find(|path| path.is_dir())
 }
 
 /// A running `dsh --profile web` host plus the URL its Web GUI is served on.
@@ -46,19 +74,36 @@ impl std::fmt::Display for DshError {
 impl std::error::Error for DshError {}
 
 impl DshProcess {
-    /// Spawn the host named by `DSH_BIN` (or `dsh`) and block until ready.
+    /// Spawn the bundled sidecar (or `DSH_BIN`/`dsh`) and block until ready.
     pub fn start() -> Result<Self, DshError> {
-        Self::start_with(&dsh_bin())
+        let bin = resolve_bin();
+        Self::start_with(&bin.to_string_lossy())
     }
 
     /// Spawn `bin --profile web --port 0` and block until it prints its URL.
     pub fn start_with(bin: &str) -> Result<Self, DshError> {
-        let mut child = Command::new(bin)
+        let mut command = Command::new(bin);
+        command
             .args(DSH_ARGS)
             .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        if let Some(libdir) = sharp_libs_dir() {
             // The host's stderr stays on ours: diagnostics appear in the
             // developer's terminal (or macOS Console.app when packaged).
-            .stderr(Stdio::inherit())
+            let var = if cfg!(target_os = "macos") {
+                "DYLD_LIBRARY_PATH"
+            } else {
+                "LD_LIBRARY_PATH"
+            };
+            let existing = std::env::var(var).unwrap_or_default();
+            let value = if existing.is_empty() {
+                libdir.to_string_lossy().into_owned()
+            } else {
+                format!("{}:{existing}", libdir.display())
+            };
+            command.env(var, value);
+        }
+        let mut child = command
             .spawn()
             .map_err(|err| DshError(format!("failed to spawn `{bin} --profile web`: {err}")))?;
 

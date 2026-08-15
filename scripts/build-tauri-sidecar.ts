@@ -408,7 +408,7 @@ class SidecarBuild {
     // DYLD_LIBRARY_PATH (macOS) to this directory.
     const sharpOs = target.platform === 'macos' ? 'darwin' : 'linux'
     const libvipsSrc = join(this.staging, 'node_modules', '@img', `sharp-libvips-${sharpOs}-${target.arch}`, 'lib')
-    const libvipsDir = join(this.outDir, `sharp-libs-${target.tauriTriple}`)
+    const libvipsDir = join(this.outDir, 'sharp-libs')
     if (this.cli.dryRun) {
       console.log(`build-tauri-sidecar: [dry-run] cp ${libvipsSrc}/* ${libvipsDir}/`)
     } else if (existsSync(libvipsSrc)) {
