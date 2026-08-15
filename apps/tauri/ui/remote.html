@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Connect to Remote</title>
+    <style>
+      body {
+        font-family: -apple-system, "Helvetica Neue", sans-serif;
+        margin: 0;
+        padding: 20px;
+        color: #222;
+      }
+      form { display: flex; flex-direction: column; gap: 12px; }
+      input[type="text"] {
+        font-size: 14px;
+        padding: 8px 10px;
+        border: 1px solid #bbb;
+        border-radius: 6px;
+      }
+      button {
+        font-size: 14px;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        background: #2563eb;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      #error { color: #b91c1c; font-size: 12px; min-height: 14px; }
+    </style>
+  </head>
+  <body>
+    <form id="form">
+      <label for="url">Remote <code>dsh web</code> URL</label>
+      <input id="url" type="text" placeholder="http://host:port" autofocus />
+      <button id="submit" type="submit">Connect</button>
+      <div id="error"></div>
+    </form>
+    <script>
+      const form = document.getElementById('form');
+      const input = document.getElementById('url');
+      const button = document.getElementById('submit');
+      const error = document.getElementById('error');
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        error.textContent = '';
+        try {
+          await window.__TAURI__.core.invoke('connect_remote', { url: input.value });
+          await window.__TAURI__.window.getCurrentWindow().close();
+        } catch (err) {
+          button.disabled = false;
+          error.textContent = String(err);
+        }
+      });
+    </script>
+  </body>
+</html>
