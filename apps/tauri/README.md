@@ -69,6 +69,9 @@ itself works on Linux with the WebKitGTK 4.1 dev packages installed.
 
 - `DSH_BIN` — override the binary to spawn (default: the bundled `dsh-web`
   sidecar, then `dsh` on `PATH`).
+- `DSH_REMOTE_URL=http://host:port` — remote mode: load an already-running
+  `dsh --profile web` host instead of spawning the local sidecar. The
+  **Remote ▸ Connect to Remote…** menu item does the same interactively.
 - Everything else (API key, `DSH_HOME`, `--host`, …) is dsh's own
   configuration and passes through the inherited environment. An
   `DEEPSEEK_API_KEY` is only needed to actually run an agent; the GUI opens
