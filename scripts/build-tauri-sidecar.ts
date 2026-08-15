@@ -22,8 +22,8 @@ const root = resolve(import.meta.dirname, '..')
 
 /** The dependency-only closure manifest whose deps define the web profile. */
 const DEPLOY_ROOT_PACKAGE = 'dsh-web-sidecar-pkg'
-/** The closed-runtime entry inside the deployed closure (the CLI's own bin). */
-const ENTRY_BIN = 'node_modules/@deepseek-ai/dsh/lib/bin.js'
+/** The closed-runtime entry inside the deployed closure (the packaged CLI bin). */
+const ENTRY_BIN = 'node_modules/@deepseek-ai/dsh/lib/packaged-bin.js'
 /** Legacy deploy may hoist peer-specialized workspace packages back here. */
 const DEPLOY_SOURCE_NODE_MODULES = 'apps/tauri-sidecar/node_modules'
 /** Sidecar command name; binaries are named `<name>-<tauri-triple>`. */
@@ -246,7 +246,7 @@ class SidecarBuild {
       console.log('build-tauri-sidecar: skipping pnpm run build (--skip-build)')
       return
     }
-    await this.run('build', pnpmBin(), ['run', 'build'])
+    await this.run('build', pnpmBin(), ['--config.verify-deps-before-run=false', 'run', 'build'])
   }
 
   /** Clear and deploy the CLI closure into the staging directory. */

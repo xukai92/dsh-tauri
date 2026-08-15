@@ -180,6 +180,13 @@ export interface RunProfileOptions {
   patchFiles: readonly string[]
   /** The invocation's inner arguments, handed to the tree through `ctx.cmdlineArgs`. */
   args: readonly string[]
+  /**
+   * Installed-host base for bare plugin names. The packaged single-file runtime
+   * passes `import.meta.url` here so bare names resolve from its VFS instead of
+   * the profile's `$DSH_HOME/profiles/node_modules`; source and installed runs
+   * omit it and keep configuration-relative resolution.
+   */
+  bareModuleBaseUrl?: string
 }
 
 /**
@@ -256,7 +263,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       args: options.args,
       exit: code => void shutdown.shutdown(code),
     })
-  })
+  }, options.bareModuleBaseUrl)
   app.current = ctx
   // A surface can dispose the whole tree while boot or this post-boot watcher
   // setup is still in flight — a signal, or a fast one-shot's appExit. Loader
