@@ -132,7 +132,10 @@ pub fn run() {
             )?;
             let submenu =
                 Submenu::with_items(app, "Connection", true, &[&connect_local, &connect_remote])?;
-            let menu = Menu::with_items(app, &[&submenu])?;
+            // Start from the standard macOS menu (app menu with Quit, File,
+            // Edit, View, Window, Help), then slot Connection in after the app menu.
+            let menu = Menu::default(app.handle())?;
+            menu.insert(&submenu, 1)?;
             app.set_menu(menu)?;
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
