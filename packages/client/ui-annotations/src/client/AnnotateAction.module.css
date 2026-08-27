@@ -1,0 +1,77 @@
+/* Per-message annotate control. The button mirrors the shared message
+   IconActions chrome so the strip reads as one row; the editor is an inline
+   expansion anchored to the same row. */
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border: none;
+  border-radius: 28px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.action[data-active] {
+  color: var(--dsw-alias-label-primary);
+}
+
+.editor {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.quoted,
+.comment {
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-secondary);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-primary);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.quoted {
+  width: 200px;
+}
+
+.comment {
+  width: 260px;
+}
+
+.save,
+.cancel {
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.save {
+  background: var(--dsw-alias-interactive-bg-primary);
+  color: var(--dsw-alias-label-inverse);
+}
+
+.cancel {
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.cancel:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}

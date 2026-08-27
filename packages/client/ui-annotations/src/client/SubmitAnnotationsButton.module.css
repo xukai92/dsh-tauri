@@ -1,0 +1,38 @@
+/* Submit-with-annotations control: an icon button in the composer's trailing
+   row, after the primary send button. It stays neutral until hovered, with a
+   blue count badge mirroring the send button's info fill. */
+
+.button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  transform: translateY(-2px);
+}
+
+.button:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--dsw-alias-button-info-fill);
+  color: var(--dsw-alias-label-inverse);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}
