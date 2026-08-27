@@ -57,7 +57,7 @@ jobs:
         run: pnpm --config.verify-deps-before-run=false tauri build
 
       - name: Upload macOS bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dsh-tauri-macos-aarch64
           path: |
