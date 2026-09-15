@@ -95,5 +95,8 @@ The app version comes from the repository root `package.json`. Pushing a matchin
   `packages/host/apiproxy` and `packages/host/webserver`).
 - **Placeholder icons.** Generated from `apps/web/public/favicon.svg`; replace
   with a proper branded icon set before shipping.
-- **Unsigned build.** `tauri build` output is ad-hoc signed; distribution needs
-  a Developer ID and notarization.
+- **Ad-hoc signature.** The explicit `-` signing identity prevents Apple Silicon
+  downloads from being reported as damaged. Because the app is not notarized,
+  first launch can still require approval in **System Settings ▸ Privacy &
+  Security**. Warning-free distribution needs a Developer ID Application
+  certificate and Apple notarization credentials in CI.

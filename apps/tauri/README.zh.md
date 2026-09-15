@@ -55,4 +55,4 @@ pnpm tauri build        # from apps/tauri
 - **单文件 exe 加一个共享库。** sidecar 本身是单文件，但 `sharp`（图像附件）需要在其旁边提供 libvips 库（`apps/tauri/binaries/sharp-libs`），因为 pkg 的 VFS 无法满足 `.node` RPATH。Node-pty 的 macOS `spawn-helper` 对持久终端也需要同样的处理。
 - **回环 HTTP，无 IPC bridge。** 我们使用浏览器同样使用的 `http://127.0.0.1:<port>` 传输。如果 shell 以后需要通过 `file://` 加载 `dist/`，宿主的 `FetchHandler`/`AbstractApiClient.doFetch` seam 是预定的 IPC bridge 插入点（见 `packages/host/apiproxy` 和 `packages/host/webserver`）。
 - **占位图标。** 由 `apps/web/public/favicon.svg` 生成；发行前需替换为正式品牌图标集。
-- **未签名的构建。** `tauri build` 输出使用 ad-hoc 签名；分发需要 Developer ID 和公证。
+- **Ad-hoc 签名。** 显式的 `-` 签名身份可防止 Apple Silicon 将下载的应用报告为已损坏。由于应用尚未公证，首次启动时仍可能需要在**系统设置 ▸ 隐私与安全性**中批准。要实现无警告分发，需要在 CI 中配置 Developer ID Application 证书和 Apple 公证凭据。

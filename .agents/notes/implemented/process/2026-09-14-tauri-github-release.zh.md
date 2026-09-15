@@ -14,6 +14,8 @@ macOS 工作流只把 `.app` 和 DMG 保留为七天期的 GitHub Actions 产物
 
 build 作业沿用 `dsh-tauri-macos-aarch64` 产物名上传 macOS bundle。依赖它的 release 作业只对 `refs/tags/dsh-v*` ref 运行，下载该精确产物，要求其中恰好有一个 DMG，并使用 `--verify-tag` 和生成的发布说明将其交给 `gh release create`。该作业不 checkout 源码树，因此它从 `github.repository` 设置 `GH_REPO`。只有该作业获得 `contents: write`；来自可变分支和 Pull Request 的构建保留 `contents: read`。
 
+Bundle 配置显式向 Tauri 提供 `-` 签名身份。在没有 Apple Developer 凭据时，它会生成下载的 Apple Silicon 应用所需的 ad-hoc 签名。构建在上传前使用 `codesign --deep --strict` 验证完整应用 bundle，因此缺失或无效的签名无法进入 release。
+
 带预发布段的版本会创建 GitHub 预发布，且不会标为 latest。稳定版本保留 GitHub 通常的 latest release 选择方式。Tauri 通过配置支持的 package 路径读取仓库根 `package.json`，因此共享 dsh 版本升级也会提供 macOS bundle 版本。
 
 工作流测试固定 tag 触发器、ref 条件、拆分的权限、tag 校验、DMG 选择、发布命令、预发布处理和 Tauri 版本真源。
@@ -32,4 +34,4 @@ build 作业沿用 `dsh-tauri-macos-aarch64` 产物名上传 macOS bundle。依�
 
 推送或手动 dispatch 匹配的 `dsh-v*` tag 会生成持久的 GitHub Release，其 DMG 来自已完成的 macOS 构建。分支、Pull Request、不匹配的 tag 或手动分支 dispatch 都无法创建 release。对 release 已存在的 tag 重新运行会失败，而不是替换已发布产物。
 
-发布的应用仍使用 ad-hoc 签名且未经公证。GitHub Release 可用性不会消除 macOS Gatekeeper 警告；Developer ID 签名和公证仍是独立的发行工作。
+发布的应用仍使用 ad-hoc 签名且未经公证。该签名可防止 macOS 将未签名的 Apple Silicon 下载报告为已损坏，但用户首次启动时仍可能需要在“隐私与安全性”中批准。无警告分发需要 Developer ID Application 证书和 Apple 公证凭据。

@@ -69,6 +69,15 @@ jobs:
         working-directory: apps/tauri
         run: pnpm --config.verify-deps-before-run=false tauri build
 
+      - name: Verify macOS code signature
+        run: |
+          apps=(apps/tauri/src-tauri/target/release/bundle/macos/*.app)
+          if [[ ${#apps[@]} -ne 1 || ! -d "${apps[0]}" ]]; then
+            echo "::error::Expected exactly one macOS app bundle."
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+
       - name: Upload macOS bundle
         uses: actions/upload-artifact@v4
         with:

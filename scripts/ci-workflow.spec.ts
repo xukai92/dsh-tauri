@@ -540,11 +540,13 @@ describe('Tauri macOS publication', () => {
     })
 
     const verify = build.steps.filter(isRecord).find(step => step.name === 'Verify release tag')
+    const verifySignature = build.steps.filter(isRecord).find(step => step.name === 'Verify macOS code signature')
     const publish = release.steps.filter(isRecord).find(step => step.name === 'Publish macOS release')
     expect(verify).toMatchObject({
       if: "startsWith(github.ref, 'refs/tags/dsh-v')",
     })
     expect(JSON.stringify(verify)).toContain("require('./package.json').version")
+    expect(JSON.stringify(verifySignature)).toContain('codesign --verify --deep --strict')
     expect(JSON.stringify(publish)).toContain('gh release create')
     expect(JSON.stringify(publish)).toContain('dist/dmg/*.dmg')
     expect(JSON.stringify(publish)).toContain('--verify-tag')
@@ -555,7 +557,10 @@ describe('Tauri macOS publication', () => {
       resolve(root, 'apps/tauri/src-tauri/tauri.conf.json'),
       'utf8',
     ))
-    expect(tauriConfig).toMatchObject({ version: '../../../package.json' })
+    expect(tauriConfig).toMatchObject({
+      version: '../../../package.json',
+      bundle: { macOS: { signingIdentity: '-' } },
+    })
   })
 })
 

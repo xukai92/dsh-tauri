@@ -14,6 +14,8 @@ The macOS workflow retained its `.app` and DMG only as a seven-day GitHub Action
 
 The build job uploads the macOS bundle under the existing `dsh-tauri-macos-aarch64` artifact name. A dependent release job runs only for a `refs/tags/dsh-v*` ref, downloads that exact artifact, requires exactly one DMG, and passes it to `gh release create` with `--verify-tag` and generated release notes. The job sets `GH_REPO` from `github.repository` because it does not check out the source tree. Only this job receives `contents: write`; builds from mutable branches and pull requests retain `contents: read`.
 
+The bundle config supplies Tauri's `-` signing identity explicitly. This produces the ad-hoc signature required for downloaded Apple Silicon applications when no Apple Developer credentials are available. The build verifies the complete app bundle with `codesign --deep --strict` before uploading it, so a missing or invalid signature cannot reach a release.
+
 A version with a prerelease segment creates a GitHub prerelease and is not marked latest. A stable version leaves GitHub's normal latest-release selection in effect. Tauri reads the repository root `package.json` through the configuration's supported package path, so the shared dsh version bump also supplies the macOS bundle version.
 
 The workflow test pins the tag trigger, ref condition, split permissions, tag verification, DMG selection, release command, prerelease handling, and Tauri version source.
@@ -32,4 +34,4 @@ The workflow test pins the tag trigger, ref condition, split permissions, tag ve
 
 Pushing or manually dispatching a matching `dsh-v*` tag produces a durable GitHub Release whose DMG comes from the completed macOS build. A branch, pull request, mismatched tag, or manual branch dispatch cannot create a release. Re-running a tag after its release exists fails rather than replacing a published asset.
 
-The published app remains ad-hoc signed and unnotarized. GitHub Release availability does not remove macOS Gatekeeper warnings; Developer ID signing and notarization remain separate distribution work.
+The published app remains ad-hoc signed and unnotarized. The signature prevents macOS from reporting an unsigned Apple Silicon download as damaged, but users can still need to approve first launch in Privacy & Security. Warning-free distribution requires a Developer ID Application certificate and Apple notarization credentials.
