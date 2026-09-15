@@ -214,6 +214,7 @@
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.0",
     "@types/spdx-expression-parse": "^4.0.0",
+    "@types/ws": "8.18.1",
     "@vitest/coverage-v8": "^4.1.8",
     "@yao-pkg/pkg": "6.21.0",
     "@yarnpkg/cli-dist": "4.17.1",
@@ -239,6 +240,7 @@
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "ws": "8.21.0"
   }
 }

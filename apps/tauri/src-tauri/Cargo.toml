@@ -1,0 +1,25 @@
+[package]
+name = "dsh-tauri"
+version = "0.1.0"
+description = "DeepSeek Harness desktop shell — a Tauri webview over dsh --profile web"
+authors = ["DeepSeek Harness contributors"]
+edition = "2021"
+
+# Desktop-only for now (macOS first). The cdylib/staticlib targets are the
+# standard Tauri layout and keep the mobile path open without renaming anything.
+[lib]
+name = "dsh_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+url = "2"
+
+# Smaller, faster release binaries.
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
