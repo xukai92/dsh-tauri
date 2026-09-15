@@ -153,8 +153,30 @@ describe('ui-settings-models apply', () => {
     expect(() => b.locale.register('settings.models', 'en', {})).not.toThrow()
   })
 
-  it('keeps remote-browser acknowledgement in process memory', async () => {
-    const b = await bench(false)
+  it('persists remote-browser acknowledgement through Host settings', async () => {
+    const namespace = (value: object, revision: number) => ({
+      ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
+      schema: {},
+      value,
+      applies: 'live' as const,
+      secrets: [],
+      revision,
+    })
+    const describeSettings = vi.fn().mockResolvedValue({
+      rpcId: 'remote-welcome-describe' as never,
+      result: {
+        ok: true as const,
+        value: { writable: true, hasDocument: false, namespaces: [namespace({}, 0)] },
+      },
+    })
+    const mutateSettings = vi.fn().mockResolvedValue({
+      rpcId: 'remote-welcome-mutate' as never,
+      result: {
+        ok: true as const,
+        value: namespace({ [WELCOME_NOTICE_ACK_FIELD]: WELCOME_NOTICE_VERSION }, 1),
+      },
+    })
+    const b = await bench(false, { describe: describeSettings, mutate: mutateSettings })
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')
@@ -164,9 +186,21 @@ describe('ui-settings-models apply', () => {
     )()
 
     await injected.controller.load()
-    expect(injected.controller.store.getSnapshot()).toEqual({
-      status: 'ready', acknowledged: false, error: null,
+    await vi.waitFor(() => {
+      expect(injected.controller.store.getSnapshot()).toEqual({
+        status: 'ready', acknowledged: false, error: null,
+      })
     })
+    await expect(injected.controller.acknowledge()).resolves.toBe(true)
+    expect(mutateSettings).toHaveBeenCalledWith({
+      ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
+      ops: [{ op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION }],
+      expectedRevision: 0,
+    })
+    expect(injected.controller.store.getSnapshot()).toEqual({
+      status: 'ready', acknowledged: true, error: null,
+    })
+    expect(describeSettings).toHaveBeenCalled()
   })
 })
 

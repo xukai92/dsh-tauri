@@ -15,5 +15,5 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **Remote browsers get no durable settings** — the settings RPCs are loopback-only, so a scope bound in a non-loopback browser starts `unavailable` and never crosses the wire; every row it backs is inert there.
+- **Remote settings require an authorized Host** — a non-loopback browser uses the Host settings document only when the server accepts its authority through `trustedHosts`; the browser has no process-local settings fallback.
 - **One field per write** — `set` sends a single `set` op, so a row that must move two fields together has no transaction and publishes two revisions.

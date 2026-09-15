@@ -9,8 +9,8 @@ an unauthenticated remote-code-execution surface. This fork re-enables it on the
 premise that the tailnet — or, more precisely, the network reachable at the
 declared `--trusted-host` authority — IS the authentication boundary.
 
-All fork documentation lives in this file; the upstream README files and Agent
-Notes are left unmodified.
+This file inventories the fork-specific patches; package documentation and
+Agent Notes state the resulting runtime contracts at their owning locations.
 
 ## Usage
 
