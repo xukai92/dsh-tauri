@@ -14,6 +14,18 @@ const runnerPrivatePnpmDestination = /^\$\{\{ runner\.temp \}\}\/setup-pnpm-\$\{
 const nativeWindowsPnpmDestination = '${{ runner.temp }}/setup-pnpm-js-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}'
 
 describe('CI workflow', () => {
+  it('builds the Tauri bundle from maintained runtime products under its own tag family', () => {
+    const workflow = loadWorkflow('.github/workflows/build-tauri-macos.yml')
+    const build = workflowJob(workflow, 'build')
+    const release = workflowJob(workflow, 'release')
+    if (!Array.isArray(build.steps)) throw new TypeError('Tauri build job must define steps')
+    const commands = build.steps.filter(isRecord).map(step => step.run).filter(value => typeof value === 'string')
+    expect(commands).toContain('pnpm exec tsx scripts/build-tauri-sidecar.ts --targets node24-macos-arm64')
+    expect(commands).toContainEqual(expect.stringContaining('scripts/smoke-tauri-bundle.ts --app'))
+    expect(release.if).toBe("startsWith(github.ref, 'refs/tags/tauri-v')")
+    expect(JSON.stringify(workflow.on)).toContain('tauri-v*')
+  })
+
   it('prepares confinement before Node compatibility smokes', () => {
     const job = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-compat')
     if (!Array.isArray(job.steps)) throw new TypeError('Node compatibility job must define steps')
