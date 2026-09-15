@@ -16,6 +16,8 @@ The macOS workflow first verifies the complete application signature, then runs 
 
 The smoke then launches `Contents/MacOS/dsh-tauri`, discovers its direct `dsh-web` child and listening port, loads that frontend, requests the standard macOS application Quit through AppleScript, and requires both processes to exit. This executes the Tauri `RunEvent::Exit` path rather than assuming a sidecar-only test covers application shutdown.
 
+The packaged host keeps its installed runtime URL on the root context while nested profile contexts use their configuration file URL. Agent preset mounts resolve bare plugin rows from the root runtime and relative rows from the preset directory. A nested-profile regression exercises both rows in one preset so an isolated `DSH_HOME` represents packaged resolution instead of inheriting a source checkout's module search path.
+
 The supervisor starts its local host in a distinct process group. Normal application exit explicitly takes the managed host and sends that group `SIGTERM`, allowing six seconds for the CLI's five-second context disposal before sending `SIGKILL` to a remaining group. Cross-platform standalone Rust tests cover complete readiness URL preservation, strict loopback readiness parsing, ordinary group cleanup, and escalation when the leader exits while a same-group descendant ignores `SIGTERM`. Graceful CLI disposal remains responsible for subprocesses and PTYs that created their own groups.
 
 The remote browser test uses `remote.test` through Chromium host resolution. It asserts an insecure context without `crypto.randomUUID`, calls the real host RPC surface, acknowledges the welcome setting, reloads, and observes the persisted remote setting. Its environment is keyless and isolated from ambient credentials.

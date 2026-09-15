@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-09-15-tauri-bundle-runtime-smoke.md
-2026-09-15-tauri-bundle-runtime-smoke.md: d873b23f7be434d479f801d1698daf85c5b34aba
-2026-09-15-tauri-bundle-runtime-smoke.zh.md: 4cbea15c314cdf7e75e7fe079ae4a4a20fc785e5
+2026-09-15-tauri-bundle-runtime-smoke.md: 1b277599eecdbd6ea4b33232d38da7beb41756a8
+2026-09-15-tauri-bundle-runtime-smoke.zh.md: e3a5d3b9338898a418177fe361f7cbcc5a126d74

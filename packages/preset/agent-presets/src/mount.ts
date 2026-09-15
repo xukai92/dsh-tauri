@@ -46,7 +46,7 @@ const mounted = new WeakMap<object, MountedTree>()
  * The base URL bare specifiers resolve against, per pending mount, keyed by the
  * same config object. Recorded before the subtree is plugged, because `Include`
  * rewrites its own context's `baseUrl` to the composition's directory and the
- * pre-mount value is the only handle on where the harness itself lives.
+ * root value is the only handle on where the harness itself lives.
  */
 const harnessBase = new WeakMap<object, string>()
 
@@ -69,7 +69,7 @@ class PresetTree extends Include {
    * a package name: a locally authored preset lives under the user's home,
    * where Node's upward `node_modules` walk never reaches the harness's own
    * dependencies, so every `@deepseek-ai/dsh-*` row would fail to import. The
-   * mount records the host composition's base instead, which is inside the
+   * mount records the root runtime's base instead, which is inside the
    * installed harness, and bare names resolve from there. An absolute
    * filesystem path names neither base and becomes a file URL before Node's
    * ESM loader receives it, which is required for drive-letter paths on
@@ -338,11 +338,10 @@ export async function mountPreset(agentCtx: Context, preset: AgentPreset): Promi
     )
   }
   const config: Include.Config = { path: pathToFileURL(preset.path).href }
-  // Captured before the subtree exists: the standing scope context still
-  // carries the host composition's base, which is inside the installed
-  // harness and is therefore where a row's package name has to resolve from.
+  // The root owns the installed runtime base. A nested profile context instead
+  // carries the profile file's base, which cannot resolve packaged plugins.
   /* v8 ignore next -- the Loader sets `baseUrl` on the root before any scoped context derives from it */
-  if (agentCtx.baseUrl !== undefined) harnessBase.set(config, agentCtx.baseUrl)
+  if (agentCtx.root.baseUrl !== undefined) harnessBase.set(config, agentCtx.root.baseUrl)
   // Before the record this mount is about to add: standing mounts are one per
   // preset and live until whole-tree teardown, so pruning here only sweeps
   // records of torn-down runtimes (tests; an HMR reload of the roster).

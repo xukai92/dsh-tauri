@@ -16,6 +16,8 @@ macOS 工作流先验证完整应用签名，然后对已构建 `.app` 运行 `s
 
 随后，冒烟测试启动 `Contents/MacOS/dsh-tauri`，发现其直接 `dsh-web` 子进程和监听端口，加载该前端，通过 AppleScript 请求标准 macOS 应用 Quit，并要求两个进程都退出。这会执行 Tauri 的 `RunEvent::Exit` 路径，而不是假设 sidecar 测试可以覆盖应用关闭。
 
+打包宿主在根 context 上保留其已安装运行时 URL，嵌套 profile context 则使用配置文件 URL。agent preset 挂载从根运行时解析裸插件行，并从 preset 目录解析相对行。嵌套 profile 回归在同一个 preset 中测试这两类行，使隔离的 `DSH_HOME` 能代表打包后的解析方式，而非继承源码 checkout 的模块查找路径。
+
 监督器在独立进程组中启动本地宿主。应用正常退出时会明确取得托管宿主并向该进程组发送 `SIGTERM`，为 CLI 的五秒 context 释放留出六秒，然后才向仍存在的进程组发送 `SIGKILL`。跨平台独立 Rust 测试覆盖完整就绪 URL 保留、严格回环就绪解析、普通进程组清理，以及 leader 已退出但同组后代忽略 `SIGTERM` 时的升级。创建了自身进程组的子进程和 PTY 仍由 CLI 正常释放负责。
 
 远程浏览器测试通过 Chromium host resolution 使用 `remote.test`。它断言页面处于没有 `crypto.randomUUID` 的不安全 context，调用真实宿主 RPC，确认欢迎设置，重新加载，并观察已持久化的远程设置。其环境无密钥且与环境中的凭据隔离。

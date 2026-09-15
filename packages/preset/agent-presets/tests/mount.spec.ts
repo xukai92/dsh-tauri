@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -32,15 +32,25 @@ const ROOTS = [
   { path: join(FIXTURES, 'user'), trust: 'user' as const },
 ]
 
+interface HarnessBaseUrls {
+  runtime: string
+  profile: string
+}
+
 /**
  * A composition carrying the registries a preset contributes to, plus the
  * preset roster.
  * @param roster - roster config, defaulting to the fixture roots.
+ * @param baseUrls - distinct root-runtime and nested-profile bases.
  * @returns the booted context.
  */
-async function harness(roster: Config = { default: 'standard', roots: ROOTS, includeUserRoot: false }): Promise<Context> {
-  const ctx = new Context()
-  ctx.baseUrl = pathToFileURL(FIXTURES).href + '/'
+async function harness(
+  roster: Config = { default: 'standard', roots: ROOTS, includeUserRoot: false },
+  baseUrls?: HarnessBaseUrls,
+): Promise<Context> {
+  const root = new Context()
+  root.baseUrl = baseUrls?.runtime ?? pathToFileURL(FIXTURES).href + '/'
+  const ctx = baseUrls === undefined ? root : root.extend({ baseUrl: baseUrls.profile })
   await ctx.plugin(Loader)
   ctx.loader.builtins.include = Include
   await ctx.plugin(LlmRuntime)
@@ -100,6 +110,49 @@ describe('composing an agent from a preset', () => {
     await agentOn(scoped, 'sess-absolute-plugin')
 
     expect(imported).toHaveBeenCalledWith(pathToFileURL(plugin).href, expect.any(String), {})
+  })
+
+  it('resolves bare rows from the runtime root and relative rows from a nested preset', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-preset-nested-profile-'))
+    const presetDir = join(root, 'nested')
+    const pluginsDir = join(root, 'plugins')
+    const profileDir = join(root, 'profile')
+    await mkdir(presetDir)
+    await mkdir(pluginsDir)
+    await mkdir(profileDir)
+    await copyFile(join(FIXTURES, 'plugins', 'contribute.js'), join(pluginsDir, 'contribute.js'))
+    await writeFile(join(presetDir, COMPOSITION_FILE), [
+      '- id: persona',
+      '  name: "@deepseek-ai/dsh-persona"',
+      '  config:',
+      '    text: Runtime-root persona',
+      '- id: relative',
+      '  name: ../plugins/contribute.js',
+      '  config:',
+      '    tool: relative',
+      '',
+    ].join('\n'))
+    const profileBase = pathToFileURL(join(profileDir, 'cordis.yml')).href
+    const runtimeBase = pathToFileURL(join(FIXTURES, '..', '..', '..', '..', '..', 'apps', 'cli', 'src', 'bin.ts')).href
+    const scoped = await harness(
+      { default: 'nested', roots: [{ path: root, trust: 'user' }], includeUserRoot: false },
+      { runtime: runtimeBase, profile: profileBase },
+    )
+    const imported = vi.spyOn(scoped.loader.internal!, 'import')
+
+    try {
+      const agent = await agentOn(scoped, 'sess-nested-profile')
+      const prompt = await scoped.systemPrompt.assemble(assembleContextFor(agent))
+
+      expect(prompt.sections.find(section => section.name === 'deployment:persona')?.text)
+        .toBe('Runtime-root persona')
+      expect(toolNames(scoped, agent)).toEqual(['relative'])
+      expect(imported).toHaveBeenCalledWith('@deepseek-ai/dsh-persona', runtimeBase, {})
+      expect(imported).toHaveBeenCalledWith('../plugins/contribute.js', pathToFileURL(presetDir).href + '/', {})
+    } finally {
+      await scoped.root.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('gives each session only its own preset\'s tools', async () => {
