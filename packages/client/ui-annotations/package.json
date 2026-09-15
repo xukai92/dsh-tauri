@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-annotations",
   "description": "Per-message text annotations and a submit-with-annotations action contributed to the composer",
-  "version": "0.1.1-rc.2",
+  "version": "0.1.1-rc.3",
   "publishConfig": {
     "access": "public"
   },
