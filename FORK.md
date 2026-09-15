@@ -1,6 +1,6 @@
 # Tauri fork
 
-This branch carries a narrow Tauri macOS carrier over the 2026-09-15 upstream DeepSeek Harness revision recorded in six-character groups as `0d1f50-007f9b-ca3f52-b06e1c-3074fa-14d5fb-0720`; removing the separators yields the exact Git SHA. It ports intent rather than replaying the earlier fork history.
+This branch carries a narrow Tauri macOS carrier over the 2026-09-15 upstream DeepSeek Harness revision. Run `git merge-base HEAD upstream/master` to recover the base revision. The branch ports intent rather than replaying the earlier fork history.
 
 ## Patch inventory
 
@@ -24,4 +24,4 @@ Tests set fresh temporary `DSH_HOME`, `DSH_AGENTS_HOME`, credential inputs, and 
 
 ## Stage 1 checkpoint
 
-The pre-integration Stage 1 branch passed 7 cross-platform supervisor tests, the full source runtime smoke, the insecure-HTTP browser replay, build and scoped checks. macOS Actions run `35010702817` additionally passed signed bundle inventory, frontend/RPC/settings/image/PTY/descendant cleanup, and actual application normal-Quit cleanup. The preserved safety and `stage1/macos-bundle-regressions` branches retain the original baseline and reviewed Stage 1 history.
+The preserved `stage1/macos-bundle-regressions` branch passed 7 cross-platform supervisor tests, the full source runtime smoke, the insecure-HTTP browser replay, build and scoped checks. macOS Actions run `35010702817` additionally passed signed bundle inventory, frontend/RPC/settings/image/PTY/descendant cleanup, and actual application normal-Quit cleanup. The branches returned by `git branch --list 'safety/*'` retain the original baseline.
