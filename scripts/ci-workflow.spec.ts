@@ -540,12 +540,16 @@ describe('Tauri macOS publication', () => {
     })
 
     const verify = build.steps.filter(isRecord).find(step => step.name === 'Verify release tag')
+    const smokeSidecar = build.steps.filter(isRecord).find(step => step.name === 'Smoke-test bundled sidecar')
     const verifySignature = build.steps.filter(isRecord).find(step => step.name === 'Verify macOS code signature')
     const publish = release.steps.filter(isRecord).find(step => step.name === 'Publish macOS release')
     expect(verify).toMatchObject({
       if: "startsWith(github.ref, 'refs/tags/dsh-v')",
     })
     expect(JSON.stringify(verify)).toContain("require('./package.json').version")
+    expect(JSON.stringify(smokeSidecar)).toContain('DYLD_LIBRARY_PATH')
+    expect(JSON.stringify(smokeSidecar)).toContain('dsh-web')
+    expect(JSON.stringify(smokeSidecar)).toContain('dsh web: http://127')
     expect(JSON.stringify(verifySignature)).toContain('codesign --verify --deep --strict')
     expect(JSON.stringify(publish)).toContain('gh release create')
     expect(JSON.stringify(publish)).toContain('dist/dmg/*.dmg')
@@ -559,7 +563,7 @@ describe('Tauri macOS publication', () => {
     ))
     expect(tauriConfig).toMatchObject({
       version: '../../../package.json',
-      bundle: { macOS: { signingIdentity: '-' } },
+      bundle: { macOS: { hardenedRuntime: false, signingIdentity: '-' } },
     })
   })
 })

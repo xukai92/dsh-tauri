@@ -96,7 +96,9 @@ The app version comes from the repository root `package.json`. Pushing a matchin
 - **Placeholder icons.** Generated from `apps/web/public/favicon.svg`; replace
   with a proper branded icon set before shipping.
 - **Ad-hoc signature.** The explicit `-` signing identity prevents Apple Silicon
-  downloads from being reported as damaged. Because the app is not notarized,
-  first launch can still require approval in **System Settings ▸ Privacy &
-  Security**. Warning-free distribution needs a Developer ID Application
-  certificate and Apple notarization credentials in CI.
+  downloads from being reported as damaged. This keyless build disables the
+  hardened runtime because the embedded Node/V8 sidecar needs executable memory;
+  the release workflow launches that signed sidecar before publication. Because
+  the app is not notarized, first launch can still require approval in **System
+  Settings ▸ Privacy & Security**. Warning-free distribution needs a Developer ID
+  Application certificate and Apple notarization credentials in CI.
