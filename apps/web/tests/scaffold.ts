@@ -407,9 +407,9 @@ export interface LaunchOptions {
   /** SDK batch cadence for a scenario-owned collector; omitted to retain the SDK default. */
   telemetryScheduledDelayMillis?: number
   /**
-   * Browse through a trusted non-loopback hostname that the browser resolves
-   * to loopback (for example `*.localhost`). The test server stays bound to
-   * 127.0.0.1; a non-resolving authority fails before Host trust is exercised.
+   * Browse through a trusted non-loopback hostname that the browser maps to
+   * loopback. The test server stays bound to 127.0.0.1, while Host requests
+   * retain this authority for the trust and cookie checks.
    */
   remoteAuthority?: string
   /** Reuse an existing harness home so a second Host can verify user settings across origins. */
@@ -665,6 +665,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   })
   let port = 0
   let baseUrl = ''
+  let networkBaseUrl = ''
   let authenticatedUrl = ''
   let cookieHeader = ''
   let replayHandle: ReplayHandle | undefined
@@ -804,8 +805,14 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       ), 'web e2e scaffold: route-only adapter')
     }
     baseUrl = `http://${browserHost}:${String(port)}`
+    networkBaseUrl = `http://127.0.0.1:${String(port)}`
     authenticatedUrl = ctx.connection.authenticatedUrl(baseUrl)
-    const login = await fetch(authenticatedUrl, { redirect: 'manual' })
+    const loginUrl = new URL(authenticatedUrl)
+    const exchangeUrl = new URL(`${loginUrl.pathname}${loginUrl.search}`, networkBaseUrl)
+    const login = await fetch(exchangeUrl, {
+      redirect: 'manual',
+      headers: { host: loginUrl.host },
+    })
     const setCookie = login.headers.get('set-cookie')
     if (login.status !== 303 || login.headers.get('location') !== '/' || setCookie === null) {
       throw new Error('web e2e scaffold: browser token exchange did not return its session cookie')
@@ -838,7 +845,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     hostFetch(path: string, init: RequestInit = {}): Promise<Response> {
       const headers = new Headers(init.headers)
       headers.set('cookie', cookieHeader)
-      return fetch(new URL(path, baseUrl), { ...init, headers })
+      headers.set('host', new URL(baseUrl).host)
+      return fetch(new URL(path, networkBaseUrl), { ...init, headers })
     },
     // Barrier stack: the in-process turn/end identifies the session, its
     // explicit flush makes the transcript durable, and the caller's browser

@@ -79,7 +79,7 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
   /**
    * @param ctx - the providing plugin's context, whose `remote.settings`
    * namespace answers the describe read.
-   * @param persistence - client-selected Host persistence; non-loopback pages may remain process-local.
+   * @param persistence - selected settings persistence; production uses the authenticated Host.
    */
   constructor(
     private readonly ctx: ClientContext,

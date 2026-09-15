@@ -6,12 +6,13 @@ import { SettingsSchemaService } from '../src/client/schema.ts'
 import { SettingsScopeBinder } from '../src/client/settings-scope.ts'
 import { apply as hostApply } from '../src/index.ts'
 
-function bench() {
+function bench(isLoopback = true) {
   const describeCall = vi.fn().mockResolvedValue({
     ok: true, value: { writable: true, hasDocument: true, namespaces: [] },
   })
   const ctx = new Context()
   const remote = new TestRemote(ctx, { settings: { describe: describeCall } })
+  remote.$host.isLoopback = isLoopback
   return { ctx, describeCall, remote, fiber: ctx.plugin({ inject: [...inject], apply }) }
 }
 
@@ -26,6 +27,14 @@ describe('settings domain base plugin', () => {
     expect(ctx.get('settingsScope')).toBeInstanceOf(SettingsScopeBinder)
     expect(ctx.get('settingsSchema')).toBeInstanceOf(SettingsSchemaService)
     await vi.waitFor(() => { expect(describeCall).toHaveBeenCalledTimes(1) })
+  })
+
+  it('uses authenticated Host persistence for a non-loopback page', async () => {
+    const { ctx, describeCall, fiber } = bench(false)
+    await fiber.await()
+    await vi.waitFor(() => { expect(describeCall).toHaveBeenCalledTimes(1) })
+    const scope = ctx.settingsScope.bind({ namespace: 'remote-test' })
+    expect(scope.getSnapshot().mode).toBe('host')
   })
 
   it('refreshes the mirror on document commits and connection resets, once each', async () => {

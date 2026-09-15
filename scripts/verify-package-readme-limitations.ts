@@ -17,6 +17,7 @@ const CANONICAL = '## Known Limitations and Deferred Work'
 
 /** Packages audited as having no limitations section, keyed by repo-relative directory. */
 const NO_LIMITATIONS: Readonly<Record<string, string>> = {
+  'packages/client/ui-settings': 'The authenticated Host settings service supports every served browser authority.',
   'packages/util/brand': 'Stateless nominal-string and canonical-key helpers have no deferred work.',
 }
 
