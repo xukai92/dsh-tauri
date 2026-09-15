@@ -34,7 +34,7 @@ pnpm tauri dev          # or: cargo tauri dev
 ## 构建 macOS 应用
 
 ```sh
-node --import tsx/esm scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
+pnpm exec tsx scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
 pnpm tauri build        # from apps/tauri
 ```
 

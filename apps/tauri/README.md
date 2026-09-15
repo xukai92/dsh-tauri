@@ -34,7 +34,7 @@ The window opens on the served GUI. `dsh`'s stderr is inherited, so host diagnos
 ## Build the macOS app
 
 ```sh
-node --import tsx/esm scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
+pnpm exec tsx scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
 pnpm tauri build        # from apps/tauri
 ```
 

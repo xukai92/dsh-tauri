@@ -20,7 +20,7 @@ describe('CI workflow', () => {
     const release = workflowJob(workflow, 'release')
     if (!Array.isArray(build.steps)) throw new TypeError('Tauri build job must define steps')
     const commands = build.steps.filter(isRecord).map(step => step.run).filter(value => typeof value === 'string')
-    expect(commands).toContain('node --import tsx/esm scripts/build-tauri-sidecar.ts --targets node24-macos-arm64')
+    expect(commands).toContain('pnpm exec tsx scripts/build-tauri-sidecar.ts --targets node24-macos-arm64')
     expect(commands).toContainEqual(expect.stringContaining('scripts/smoke-tauri-bundle.ts --app'))
     expect(release.if).toBe("startsWith(github.ref, 'refs/tags/tauri-v')")
     expect(JSON.stringify(workflow.on)).toContain('tauri-v*')

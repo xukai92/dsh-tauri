@@ -78,7 +78,7 @@ jobs:
           "$RUNNER_TEMP/dsh-supervisor-test"
 
       - name: Build the dsh web sidecar
-        run: node --import tsx/esm scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
+        run: pnpm exec tsx scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
 
       - name: Build the Tauri app
         working-directory: apps/tauri
