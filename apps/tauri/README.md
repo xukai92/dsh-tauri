@@ -1,5 +1,7 @@
 # dsh-tauri
 
+English | [中文](README.zh.md)
+
 A native macOS desktop shell for the DeepSeek Harness Web GUI. It is a thin
 [Tauri](https://tauri.app) wrapper over the existing web profile: it spawns
 `dsh --profile web`, discovers the loopback URL the host prints on readiness,
@@ -64,6 +66,8 @@ libraries into `apps/tauri/binaries/`; `tauri build` then bundles both. Produces
 building the `.app`/`.dmg` requires macOS (bundling, code signing, and
 `icon.icns` are macOS-only steps); `cargo check`/`cargo build` of the Rust
 itself works on Linux with the WebKitGTK 4.1 dev packages installed.
+
+The app version comes from the repository root `package.json`. Pushing a matching `dsh-v<version>` tag runs the macOS workflow and creates a GitHub Release containing the built DMG; prerelease versions such as `dsh-v0.1.1-rc.2` create GitHub prereleases. Branch, pull-request, and untagged manual runs retain only the seven-day Actions artifact. A manual run selected from a matching tag also publishes the release.
 
 ## Configuration
 

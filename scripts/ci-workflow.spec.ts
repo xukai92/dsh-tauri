@@ -521,6 +521,43 @@ describe('Documentation site publication', () => {
   })
 })
 
+describe('Tauri macOS publication', () => {
+  it('publishes the built DMG only from a matching dsh release tag', () => {
+    const workflow = loadWorkflow('.github/workflows/build-tauri-macos.yml')
+    const push = workflowEvent(workflow, 'push')
+    const build = workflowJob(workflow, 'build')
+    const release = workflowJob(workflow, 'release')
+    if (!Array.isArray(build.steps) || !Array.isArray(release.steps)) {
+      throw new TypeError('Tauri publication must define build and release steps')
+    }
+
+    expect(push.tags).toEqual(['dsh-v*'])
+    expect(workflow.permissions).toEqual({ contents: 'read' })
+    expect(release).toMatchObject({
+      if: "startsWith(github.ref, 'refs/tags/dsh-v')",
+      needs: 'build',
+      permissions: { contents: 'write' },
+    })
+
+    const verify = build.steps.filter(isRecord).find(step => step.name === 'Verify release tag')
+    const publish = release.steps.filter(isRecord).find(step => step.name === 'Publish macOS release')
+    expect(verify).toMatchObject({
+      if: "startsWith(github.ref, 'refs/tags/dsh-v')",
+    })
+    expect(JSON.stringify(verify)).toContain("require('./package.json').version")
+    expect(JSON.stringify(publish)).toContain('gh release create')
+    expect(JSON.stringify(publish)).toContain('dist/dmg/*.dmg')
+    expect(JSON.stringify(publish)).toContain('--verify-tag')
+    expect(JSON.stringify(publish)).toContain('--prerelease')
+
+    const tauriConfig: unknown = JSON.parse(readFileSync(
+      resolve(root, 'apps/tauri/src-tauri/tauri.conf.json'),
+      'utf8',
+    ))
+    expect(tauriConfig).toMatchObject({ version: '../../../package.json' })
+  })
+})
+
 describe('Git hooks', () => {
   it('leaves frozen Agent Note sidecars to the archive verifier', () => {
     const lefthook = loadWorkflow('lefthook.yml')
