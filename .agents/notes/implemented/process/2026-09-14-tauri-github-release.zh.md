@@ -12,7 +12,7 @@ macOS 工作流只把 `.app` 和 DMG 保留为七天期的 GitHub Actions 产物
 
 `.github/workflows/build-tauri-macos.yml` 以只读仓库权限构建普通分支、Pull Request 和手动运行。它也接受 `dsh-v*` tag 推送。tag 运行在安装依赖或构建前，校验 tag 等于 `dsh-v` 加上仓库根 `package.json` 的版本。
 
-build 作业沿用 `dsh-tauri-macos-aarch64` 产物名上传 macOS bundle。依赖它的 release 作业只对 `refs/tags/dsh-v*` ref 运行，下载该精确产物，要求其中恰好有一个 DMG，并使用 `--verify-tag` 和生成的发布说明将其交给 `gh release create`。只有该作业获得 `contents: write`；来自可变分支和 Pull Request 的构建保留 `contents: read`。
+build 作业沿用 `dsh-tauri-macos-aarch64` 产物名上传 macOS bundle。依赖它的 release 作业只对 `refs/tags/dsh-v*` ref 运行，下载该精确产物，要求其中恰好有一个 DMG，并使用 `--verify-tag` 和生成的发布说明将其交给 `gh release create`。该作业不 checkout 源码树，因此它从 `github.repository` 设置 `GH_REPO`。只有该作业获得 `contents: write`；来自可变分支和 Pull Request 的构建保留 `contents: read`。
 
 带预发布段的版本会创建 GitHub 预发布，且不会标为 latest。稳定版本保留 GitHub 通常的 latest release 选择方式。Tauri 通过配置支持的 package 路径读取仓库根 `package.json`，因此共享 dsh 版本升级也会提供 macOS bundle 版本。
 

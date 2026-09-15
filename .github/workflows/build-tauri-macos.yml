@@ -95,6 +95,7 @@ jobs:
 
       - name: Publish macOS release
         env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
           assets=(dist/dmg/*.dmg)

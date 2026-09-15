@@ -12,7 +12,7 @@ The macOS workflow retained its `.app` and DMG only as a seven-day GitHub Action
 
 `.github/workflows/build-tauri-macos.yml` builds ordinary branch, pull-request, and manual runs with read-only repository permissions. It also accepts `dsh-v*` tag pushes. A tag run verifies that the tag equals `dsh-v` plus the repository root `package.json` version before installing dependencies or building.
 
-The build job uploads the macOS bundle under the existing `dsh-tauri-macos-aarch64` artifact name. A dependent release job runs only for a `refs/tags/dsh-v*` ref, downloads that exact artifact, requires exactly one DMG, and passes it to `gh release create` with `--verify-tag` and generated release notes. Only this job receives `contents: write`; builds from mutable branches and pull requests retain `contents: read`.
+The build job uploads the macOS bundle under the existing `dsh-tauri-macos-aarch64` artifact name. A dependent release job runs only for a `refs/tags/dsh-v*` ref, downloads that exact artifact, requires exactly one DMG, and passes it to `gh release create` with `--verify-tag` and generated release notes. The job sets `GH_REPO` from `github.repository` because it does not check out the source tree. Only this job receives `contents: write`; builds from mutable branches and pull requests retain `contents: read`.
 
 A version with a prerelease segment creates a GitHub prerelease and is not marked latest. A stable version leaves GitHub's normal latest-release selection in effect. Tauri reads the repository root `package.json` through the configuration's supported package path, so the shared dsh version bump also supplies the macOS bundle version.
 

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-14-tauri-github-release.md
-2026-09-14-tauri-github-release.md: 0ca0cfd2eb278e23497f22e08928a9cfac72b3b8
-2026-09-14-tauri-github-release.zh.md: 58544eacf660e6b3406fabe9bf93699a9302a003
+2026-09-14-tauri-github-release.md: 5a414f3d4d6ee1af7b10accb58a612d5d6918784
+2026-09-14-tauri-github-release.zh.md: e4198e01dc378810d68e937c358be8ffbbc63852

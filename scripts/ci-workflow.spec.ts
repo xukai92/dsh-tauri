@@ -549,6 +549,7 @@ describe('Tauri macOS publication', () => {
     expect(JSON.stringify(publish)).toContain('dist/dmg/*.dmg')
     expect(JSON.stringify(publish)).toContain('--verify-tag')
     expect(JSON.stringify(publish)).toContain('--prerelease')
+    expect(publish).toMatchObject({ env: { GH_REPO: '${{ github.repository }}' } })
 
     const tauriConfig: unknown = JSON.parse(readFileSync(
       resolve(root, 'apps/tauri/src-tauri/tauri.conf.json'),
