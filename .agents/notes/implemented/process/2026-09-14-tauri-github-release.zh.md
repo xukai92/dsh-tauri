@@ -14,7 +14,7 @@ macOS 工作流只把 `.app` 和 DMG 保留为七天期的 GitHub Actions 产物
 
 build 作业沿用 `dsh-tauri-macos-aarch64` 产物名上传 macOS bundle。依赖它的 release 作业只对 `refs/tags/dsh-v*` ref 运行，下载该精确产物，要求其中恰好有一个 DMG，并使用 `--verify-tag` 和生成的发布说明将其交给 `gh release create`。该作业不 checkout 源码树，因此它从 `github.repository` 设置 `GH_REPO`。只有该作业获得 `contents: write`；来自可变分支和 Pull Request 的构建保留 `contents: read`。
 
-Bundle 配置显式向 Tauri 提供 `-` 签名身份。在没有 Apple Developer 凭据时，它会生成下载的 Apple Silicon 应用所需的 ad-hoc 签名。此无密钥构建会禁用 Tauri 的 hardened runtime，因为把它应用于嵌入的 Node 可执行文件会使 V8 无法保留其可执行代码范围。上传前，工作流会用打包的 libvips 目录启动已签名的 `dsh-web` sidecar，要求它输出回环就绪 URL，然后使用 `codesign --deep --strict` 验证完整应用 bundle。因此，结构上有效但会阻止应用启动的签名无法进入 release。
+Bundle 配置显式向 Tauri 提供 `-` 签名身份。在没有 Apple Developer 凭据时，它会生成下载的 Apple Silicon 应用所需的 ad-hoc 签名。此无密钥构建会禁用 Tauri 的 hardened runtime，因为把它应用于嵌入的 Node 可执行文件会使 V8 无法保留其可执行代码范围。上传前，工作流会使用 `codesign --deep --strict` 验证完整应用 bundle，然后按照 [bundle 运行时冒烟测试说明](../testing/2026-09-15-tauri-bundle-runtime-smoke.zh.md)测试已签名的 sidecar 和应用正常退出。因此，结构上有效但会阻止应用或其原生运行时路径工作的签名无法进入 release。
 
 带预发布段的版本会创建 GitHub 预发布，且不会标为 latest。稳定版本保留 GitHub 通常的 latest release 选择方式。Tauri 通过配置支持的 package 路径读取仓库根 `package.json`，因此共享 dsh 版本升级也会提供 macOS bundle 版本。
 

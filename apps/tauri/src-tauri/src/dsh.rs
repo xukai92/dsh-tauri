@@ -14,14 +14,20 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::channel;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 /// How long to wait for the host's readiness line before failing startup.
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
+/// Grace period between the host process group's termination request and its
+/// forced shutdown.
+const STOP_TIMEOUT: Duration = Duration::from_secs(6);
 
 /// `dsh --profile web` arguments. `--port 0` asks the OS to assign a free port,
 /// so two shells never collide; the actual URL comes from the readiness line.
-const DSH_ARGS: [&str; 4] = ["--profile", "web", "--port", "0"];
+const DSH_ARGS: [&str; 5] = ["--profile", "web", "--port", "0", "--no-open"];
 
 /// Resolve the host binary: the bundled Tauri sidecar (`dsh-web` beside this
 /// executable), else `DSH_BIN`, else `dsh` on `PATH`.
@@ -92,6 +98,8 @@ impl DshProcess {
             .args(DSH_ARGS)
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
+        #[cfg(unix)]
+        command.process_group(0);
         if let Some(libdir) = sharp_libs_dir() {
             // The host's stderr stays on ours: diagnostics appear in the
             // developer's terminal (or macOS Console.app when packaged).
@@ -169,23 +177,58 @@ impl Drop for DshProcess {
     }
 }
 
-/// Kill the host and reap it; best-effort on both counts.
+/// Stop the owned host process tree and reap its leader; best-effort on both counts.
 fn reap(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let process_group = child.id() as std::ffi::c_int;
+        signal_process_group(process_group, 15);
+        let deadline = Instant::now() + STOP_TIMEOUT;
+        while Instant::now() < deadline {
+            let _ = child.try_wait();
+            if !process_group_exists(process_group) {
+                let _ = child.wait();
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        signal_process_group(process_group, 9);
+    }
+    #[cfg(not(unix))]
     let _ = child.kill();
     let _ = child.wait();
 }
 
-/// Extract the loopback URL from a readiness line, e.g.
-/// `dsh web: http://127.0.0.1:43210 (LAN: http://192.168.1.7:43210)`.
-fn parse_web_url(line: &str) -> Option<String> {
-    const MARKER: &str = "http://127.0.0.1:";
-    let rest = &line[line.find(MARKER)? + MARKER.len()..];
-    let port: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-    if port.is_empty() {
-        None
-    } else {
-        Some(format!("http://127.0.0.1:{port}"))
+#[cfg(unix)]
+fn signal_process_group(process_group: std::ffi::c_int, signal: std::ffi::c_int) {
+    // The child is spawned as the leader of a process group owned by this
+    // supervisor, so a negative pid targets only that owned tree.
+    unsafe {
+        unsafe extern "C" {
+            fn kill(pid: std::ffi::c_int, signal: std::ffi::c_int) -> std::ffi::c_int;
+        }
+        kill(-process_group, signal);
     }
+}
+
+#[cfg(unix)]
+fn process_group_exists(process_group: std::ffi::c_int) -> bool {
+    unsafe extern "C" {
+        fn kill(pid: std::ffi::c_int, signal: std::ffi::c_int) -> std::ffi::c_int;
+    }
+    unsafe { kill(-process_group, 0) == 0 }
+}
+
+/// Extract the complete loopback URL from the canonical readiness line.
+fn parse_web_url(line: &str) -> Option<String> {
+    let candidate = line.strip_prefix("dsh web: ")?.split_whitespace().next()?;
+    let after_host = candidate.strip_prefix("http://127.0.0.1:")?;
+    let port_end = after_host.find(['/', '?', '#']).unwrap_or(after_host.len());
+    let port = after_host[..port_end].parse::<u16>().ok()?;
+    if port == 0 {
+        return None;
+    }
+    Some(candidate.to_owned())
 }
 
 #[cfg(test)]
@@ -209,8 +252,19 @@ mod tests {
     }
 
     #[test]
+    fn preserves_path_and_auth_query() {
+        assert_eq!(
+            parse_web_url("dsh web: http://127.0.0.1:43210/?token=secret"),
+            Some("http://127.0.0.1:43210/?token=secret".to_owned()),
+        );
+    }
+
+    #[test]
     fn ignores_lines_without_a_loopback_url() {
         assert_eq!(parse_web_url("some other output"), None);
         assert_eq!(parse_web_url("http://192.168.1.7:43210"), None);
+        assert_eq!(parse_web_url("log: http://127.0.0.1:43210"), None);
+        assert_eq!(parse_web_url("dsh web: http://127.0.0.1/path"), None);
+        assert_eq!(parse_web_url("dsh web: http://user@127.0.0.1:43210"), None);
     }
 }

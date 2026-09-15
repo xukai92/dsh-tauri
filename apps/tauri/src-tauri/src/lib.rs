@@ -15,7 +15,7 @@ pub mod dsh;
 use std::sync::Mutex;
 
 use tauri::menu::{Menu, MenuItem, Submenu};
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 /// Managed host state: the running local sidecar, or `None` in remote mode.
 type HostState = Mutex<Option<dsh::DshProcess>>;
@@ -114,10 +114,11 @@ pub fn run() {
             .expect("dsh-tauri: host printed a malformed URL"),
     };
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![connect_remote])
         .setup(move |app| {
-            // Own the host for the app's lifetime; dropped (and killed) on exit.
+            // Own the host for the app lifetime; RunEvent::Exit takes it before
+            // Tauri terminates the process.
             // `None` in remote mode.
             app.manage(HostState::new(dsh));
 
@@ -152,6 +153,16 @@ pub fn run() {
                 let _ = connect_local(app);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+    app.run(|app, event| {
+        if matches!(event, RunEvent::Exit) {
+            // Tauri terminates the process after this callback without
+            // dropping managed state. Take the host while its CLI signal
+            // handler can still dispose terminals and subprocesses.
+            if let Ok(mut host) = app.state::<HostState>().lock() {
+                *host = None;
+            }
+        }
+    });
 }

@@ -19,7 +19,7 @@
     "category": "DeveloperTool",
     "shortDescription": "DeepSeek Harness desktop client",
     "longDescription": "Native macOS shell for the DeepSeek Harness Web GUI (dsh --profile web).",
-    "externalBin": ["../binaries/dsh-web"],
+    "externalBin": ["../binaries/dsh-web", "../binaries/dsh-web-spawn-helper"],
     "resources": ["../binaries/sharp-libs"],
     "icon": [
       "icons/32x32.png",

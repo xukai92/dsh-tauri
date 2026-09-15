@@ -6,10 +6,11 @@
  * and their transitive dependencies, which carry the whole web profile
  * including the built frontend dist — instead of the SDK JSON-RPC server.
  *
- * Output: `apps/tauri/binaries/dsh-web-<tauri-triple>`, consumed by the Tauri
- * bundle as an `externalBin` sidecar. The deployed closure is symlink-free and
- * carries whole-tree assets to cover Cordis's runtime bare-package imports
- * that pkg cannot discover statically.
+ * Output: `apps/tauri/binaries/dsh-web-<tauri-triple>` and, on macOS,
+ * `dsh-web-spawn-helper-<tauri-triple>`, both consumed by the Tauri bundle as
+ * `externalBin` sidecars. The deployed closure is symlink-free and carries
+ * whole-tree assets to cover Cordis's runtime bare-package imports that pkg
+ * cannot discover statically.
  */
 
 import { spawn } from 'node:child_process'
@@ -417,7 +418,7 @@ class SidecarBuild {
       console.log(`build-tauri-sidecar: emitted sharp libvips to ${libvipsDir}`)
     }
     if (target.platform !== 'macos') return [product]
-    const spawnHelper = `${product}-spawn-helper`
+    const spawnHelper = join(this.outDir, `${SIDECAR_NAME}-spawn-helper-${target.tauriTriple}`)
     const source = join(this.staging, 'node_modules', 'node-pty', 'prebuilds', `darwin-${target.arch}`, 'spawn-helper')
     if (this.cli.dryRun) {
       console.log(`build-tauri-sidecar: [dry-run] cp ${source} ${spawnHelper}`)

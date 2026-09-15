@@ -10,7 +10,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use dsh_tauri_lib::dsh::DshProcess;
+#[path = "../src/dsh.rs"]
+mod dsh;
+
+use dsh::DshProcess;
 
 /// A scratch directory unique to this test run.
 fn scratch_dir() -> PathBuf {
@@ -44,48 +47,51 @@ fn write_script(dir: &Path, body: &str) -> PathBuf {
 }
 
 #[test]
-fn discovers_url_and_kills_child_on_drop() {
+fn discovers_url_and_stops_owned_process_group_on_drop() {
     let dir = scratch_dir();
-    // The pid is written before the readiness line, so it is on disk by the
-    // time `start_with` returns. `exec` replaces the shell with `sleep`, so
-    // killing the process leaves no orphaned grandchild.
     let script = write_script(
         &dir,
-        r#"echo "$$" > fake.pid
+        r#"trap 'wait; exit 0' TERM
+sh -c 'trap "exit 0" TERM; echo "$$" > grandchild.pid; while :; do sleep 1; done' &
+echo "$$" > fake.pid
+while [ ! -f grandchild.pid ]; do sleep 0.01; done
 echo 'preamble: booting host'
-echo 'dsh web: http://127.0.0.1:43210 (LAN: http://192.168.1.7:43210)'
-exec sleep 60"#,
+echo 'dsh web: http://127.0.0.1:43210/?token=test-token (LAN: http://192.168.1.7:43210)'
+while :; do wait || true; done"#,
     );
 
     let dsh = DshProcess::start_with(script.to_str().expect("utf8 path")).expect("host started");
-    assert_eq!(dsh.web_url(), "http://127.0.0.1:43210");
+    assert_eq!(dsh.web_url(), "http://127.0.0.1:43210/?token=test-token");
 
-    let pid = fs::read_to_string(dir.join("fake.pid"))
-        .expect("pid file")
-        .trim()
-        .to_owned();
+    let pids = ["fake.pid", "grandchild.pid"].map(|name| {
+        fs::read_to_string(dir.join(name))
+            .expect("pid file")
+            .trim()
+            .to_owned()
+    });
 
     drop(dsh);
 
-    // `drop` kills (SIGKILL) and reaps the child, so `kill -0` must fail.
     let deadline = Instant::now() + Duration::from_secs(2);
-    loop {
-        let alive = Command::new("kill")
-            .arg("-0")
-            .arg(&pid)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-        if !alive {
-            break;
+    for pid in pids {
+        loop {
+            let alive = Command::new("kill")
+                .arg("-0")
+                .arg(&pid)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if !alive {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "owned process ({pid}) still alive after drop",
+            );
+            std::thread::sleep(Duration::from_millis(20));
         }
-        assert!(
-            Instant::now() < deadline,
-            "fake dsh ({pid}) still alive after drop",
-        );
-        std::thread::sleep(Duration::from_millis(20));
     }
 
     let _ = fs::remove_dir_all(&dir);
@@ -100,5 +106,51 @@ fn errors_when_host_exits_without_announcing_a_url() {
         result.is_err(),
         "host that never announces must fail startup"
     );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn escalates_after_leader_exits_while_group_descendant_ignores_term() {
+    let dir = scratch_dir();
+    let script = write_script(
+        &dir,
+        r#"trap 'exit 0' TERM
+sh -c 'trap "" TERM; echo "$$" > stubborn.pid; while :; do sleep 1; done' &
+while [ ! -f stubborn.pid ]; do sleep 0.01; done
+echo 'dsh web: http://127.0.0.1:43210'
+while :; do wait || true; done"#,
+    );
+    let dsh = DshProcess::start_with(script.to_str().expect("utf8 path")).expect("host started");
+    let pid = fs::read_to_string(dir.join("stubborn.pid"))
+        .expect("stubborn pid")
+        .trim()
+        .to_owned();
+
+    let started = Instant::now();
+    drop(dsh);
+    assert!(
+        started.elapsed() >= Duration::from_secs(5),
+        "supervisor returned before the CLI disposal grace elapsed",
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let alive = Command::new("kill")
+            .arg("-0")
+            .arg(&pid)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if !alive {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "stubborn process ({pid}) survived escalation"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
     let _ = fs::remove_dir_all(&dir);
 }
