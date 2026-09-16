@@ -16,6 +16,8 @@ Runner 与环境准备表达式使用 `github.repository_owner` 划分 fork 行�
 
 可复用 Python runtime 构建器始终运行 installed-wheel 无密钥检查。其真实 API 预检与 smoke 需要显式 `real_api` 输入；上游自动调用方会选择该输入，而下游调用方保持无密钥，除非维护者在手动运行时选择它。选择真实模式但未提供密钥会使预检失败。专用真实 API E2E 工作流采用相同策略：上游可信事件自动运行，下游仅接受显式手动运行。
 
+标准托管 coverage lane 会为重子进程和持久化 fixture 提供 test、polling 与 hook 预算；这些 fixture 不会用更短的局部 deadline 覆盖 lane 预算。功能性进程检查可以使用平台特定的启动上限，而性能限制仍归专用 benchmark lane 所有。需要纯后台后续 turn 的 snapshot fixture 只会在父 agent 出现权威的 `agent/status: idle` 转换后释放子级模型工作。
+
 ## 备选方案
 
 **删除仅上游使用的 lane。** Owner 条件可保留上游拓扑并减少反复出现的合并冲突，同时防止下游 job 请求不可用的 runner。
@@ -28,5 +30,6 @@ Runner 与环境准备表达式使用 `github.repository_owner` 划分 fork 行�
 
 - 下游拉取请求与合并后验证无需组织 runner 标签即可启动，复制的故障切换变量也不会改变其环境准备路径。
 - 标准托管机器使用更少的 coverage 分区、worker 数与 snapshot 并发，因此完整矩阵会比上游高容量 lane 花费更多墙钟时间。
+- 针对托管 runner 的时序调整会保留行为断言；失败仍然可观察，而不会变成重试或跳过检查。
 - 下游不会自动运行真实 provider 检查；维护者必须在配置密钥后手动触发。
 - [CI 故障切换运行手册](2026-07-26-ci-failover-runbook.zh.md)、[串行跨平台参考](2026-07-21-serial-cross-platform-ci-reference.zh.md)、[Blacksmith 故障切换记录](2026-09-09-blacksmith-failover-leg.zh.md)和[真实 API E2E 记录](../testing/2026-06-19-real-api-e2e-ci.zh.md)仍是上游运行的权威说明。

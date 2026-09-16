@@ -24,7 +24,7 @@ Rust 监督器创建一个进程组，转发 `SIGTERM`，等待六秒让 CLI 完
 
 Linux 直接用 `rustc` 运行监督器测试，覆盖正常进程组关闭、leader 退出和有界升级终止。源码驱动器在隔离的 Harness、Agent、凭据和 workspace 状态以及无密钥本地 Messages provider 上启动真实 CLI。它要求认证 HTTP/RPC、设置持久化、带标准化 WebP 元数据的完整图像轮次、持久 PTY 输出、关闭前仍存活的后台后代以及真实 ripgrep 匹配。
 
-macOS workflow 通过已签名 `.app` 的资源重复这些观察，盘点主可执行文件和两个原生 companion，并验证代码签名。它还启动真实应用，观察其返回未认证状态的回环监听器，请求正常应用 Quit，并要求应用和 Host 子进程都退出。
+macOS workflow 通过已签名 `.app` 的资源重复这些观察，盘点主可执行文件和两个原生 companion，并验证代码签名。它还会启动真实应用并观察其返回未认证状态的回环监听器，等待 AppKit 报告所生成的精确进程已经完成启动，再通过该进程身份请求正常终止，并要求应用和 Host 子进程都退出。
 
 ## Alternatives considered
 

@@ -16,6 +16,8 @@ Useful post-merge Python runtime, Wine, sandbox, and native-addon checks accept 
 
 The reusable Python runtime builder always runs installed-wheel keyless checks. Its live API preflight and smoke require an explicit `real_api` input; automatic upstream callers opt in, while downstream callers remain keyless unless a maintainer selects the manual input. Selecting live mode without the secret fails preflight. The dedicated real-API E2E workflow follows the same policy: automatic trusted events upstream and explicit manual dispatch downstream.
 
+Standard hosted coverage lanes supply the test, polling, and hook budgets for subprocess- and durability-heavy fixtures; those fixtures do not replace the lane budget with a shorter local deadline. Functional process checks may use a platform-specific startup bound, while performance limits remain in the dedicated benchmark lane. Snapshot fixtures that require a background-only follow-up turn release child model work only after the parent's authoritative `agent/status: idle` transition.
+
 ## Alternatives considered
 
 **Delete upstream-only lanes.** Owner predicates preserve the upstream topology and reduce recurring merge conflicts while preventing downstream jobs from requesting unavailable runners.
@@ -28,5 +30,6 @@ The reusable Python runtime builder always runs installed-wheel keyless checks. 
 
 - Downstream pull-request and post-merge validation can start without organization runner labels or copied failover variables changing its setup path.
 - Standard hosted machines use smaller coverage partitions, worker counts, and snapshot concurrency, so the full matrix costs more wall time than upstream high-capacity lanes.
+- Hosted-runner timing accommodations preserve behavioral assertions; failures remain observable instead of becoming retries or skipped checks.
 - Live provider checks are not automatic downstream; a maintainer must dispatch them with a configured secret.
 - The [CI failover runbook](2026-07-26-ci-failover-runbook.md), [serial cross-platform reference](2026-07-21-serial-cross-platform-ci-reference.md), [Blacksmith failover record](2026-09-09-blacksmith-failover-leg.md), and [real-API E2E record](../testing/2026-06-19-real-api-e2e-ci.md) remain authoritative for upstream operation.

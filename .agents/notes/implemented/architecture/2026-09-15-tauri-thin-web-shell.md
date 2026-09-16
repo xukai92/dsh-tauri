@@ -24,7 +24,7 @@ The existing Electron Desktop decisions remain authoritative for the upstream po
 
 Linux runs the supervisor tests directly with `rustc`, including graceful group shutdown, leader exit, and bounded escalation. The source driver launches the real CLI against isolated Harness, Agent, credential, and workspace state plus a keyless local Messages provider. It requires authenticated HTTP/RPC, persisted settings, a completed image round with normalized WebP metadata, persistent PTY output, a live background descendant before shutdown, and a real ripgrep-backed match.
 
-The macOS workflow repeats those observations through the signed `.app` resources, inventories the executable plus both native companions, and verifies code signing. It also launches the actual application, observes its unauthorized loopback listener, requests a normal application Quit, and requires both application and Host child to exit.
+The macOS workflow repeats those observations through the signed `.app` resources, inventories the executable plus both native companions, and verifies code signing. It also launches the actual application, observes its unauthorized loopback listener, waits for AppKit to report that the exact spawned process finished launching, requests normal termination through that process identity, and requires both application and Host child to exit.
 
 ## Alternatives considered
 

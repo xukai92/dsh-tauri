@@ -1,5 +1,6 @@
 /** Experimental-package publication and dependency constraints. */
 
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   isPublicExperimentalPackageDirectory,
@@ -155,12 +156,13 @@ describe('private application packaging', () => {
   })
 
   it('does not exempt an arbitrary private application from publication policy', () => {
+    const manifestPath = join('apps', 'private-example', 'package.json')
     const errors = checkWorkspaceManifest({
       dir: 'apps/private-example',
       manifest: { name: '@deepseek-ai/private-example', private: true },
     })
-    expect(errors).toContain('apps/private-example/package.json: @deepseek-ai/private-example: release member must not set "private": true')
-    expect(errors).toContain('apps/private-example/package.json: @deepseek-ai/private-example: app package has no publication files policy')
+    expect(errors).toContain(`${manifestPath}: @deepseek-ai/private-example: release member must not set "private": true`)
+    expect(errors).toContain(`${manifestPath}: @deepseek-ai/private-example: app package has no publication files policy`)
   })
 })
 

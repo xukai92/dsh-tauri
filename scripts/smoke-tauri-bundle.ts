@@ -435,6 +435,45 @@ async function waitForDesktopHost(appProcess: ChildProcess, capturedOutput: () =
   throw new Error(`desktop app did not start a listening dsh-web child:\n${capturedOutput()}`)
 }
 
+async function nativeApplicationStatus(appProcess: ChildProcess): Promise<'missing' | 'launching' | 'ready'> {
+  if (appProcess.pid === undefined) throw new Error('desktop app has no pid')
+  const script = [
+    'ObjC.import("AppKit")',
+    `const app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(${appProcess.pid})`,
+    'app.isNil() ? "missing" : (app.finishedLaunching ? "ready" : "launching")',
+  ].join('\n')
+  const status = (await capture('osascript', ['-l', 'JavaScript', '-e', script])).trim()
+  if (status === 'missing' || status === 'launching' || status === 'ready') return status
+  throw new Error(`AppKit returned an unknown desktop application status: ${status}`)
+}
+
+async function waitForDesktopApplication(appProcess: ChildProcess, capturedOutput: () => string): Promise<void> {
+  const deadline = Date.now() + 30_000
+  let status: 'missing' | 'launching' | 'ready' = 'missing'
+  while (Date.now() < deadline) {
+    if (desktopSpawnError !== undefined) throw new Error('failed to start desktop app', { cause: desktopSpawnError })
+    if (appProcess.exitCode !== null || appProcess.signalCode !== null) {
+      throw new Error(`desktop app exited during native launch with code ${String(appProcess.exitCode)}, signal ${String(appProcess.signalCode)}:\n${capturedOutput()}`)
+    }
+    status = await nativeApplicationStatus(appProcess)
+    if (status === 'ready') return
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 100))
+  }
+  throw new Error(`desktop app did not finish native launch (last AppKit status: ${status}):\n${capturedOutput()}`)
+}
+
+async function requestDesktopQuit(appProcess: ChildProcess): Promise<void> {
+  if (appProcess.pid === undefined) throw new Error('desktop app has no pid')
+  const script = [
+    'ObjC.import("AppKit")',
+    `const app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(${appProcess.pid})`,
+    'if (app.isNil()) throw new Error("desktop application is not registered with AppKit")',
+    'app.terminate ? "requested" : "refused"',
+  ].join('\n')
+  const result = (await capture('osascript', ['-l', 'JavaScript', '-e', script])).trim()
+  if (result !== 'requested') throw new Error(`AppKit refused the desktop Quit request: ${result}`)
+}
+
 async function waitForPidExit(pid: number, label: string): Promise<void> {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
@@ -630,8 +669,10 @@ try {
     const host = await waitForDesktopHost(desktopProcess, desktopOutput)
     desktopHostPid = host.pid
     console.log(`tauri desktop quit smoke: host ready appPid=${String(desktopProcess.pid)} childPid=${host.pid} url=${host.url}`)
+    await waitForDesktopApplication(desktopProcess, desktopOutput)
+    console.log(`tauri desktop quit smoke: native application finished launching appPid=${String(desktopProcess.pid)}`)
     try {
-      await capture('osascript', ['-e', 'tell application id "ai.deepseek.harness" to quit'])
+      await requestDesktopQuit(desktopProcess)
     } catch (error) {
       throw new Error(
         `normal Quit request failed; desktop code=${String(desktopProcess.exitCode)}, signal=${String(desktopProcess.signalCode)}:\n${desktopOutput()}`,
