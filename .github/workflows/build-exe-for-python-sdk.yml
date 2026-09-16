@@ -26,6 +26,11 @@ on:
         type: boolean
         required: false
         default: false
+      real_api:
+        description: Run the installed-wheel live API smoke and require its secret.
+        type: boolean
+        required: false
+        default: false
     secrets:
       DEEPSEEK_API_KEY_EXTERNAL:
         description: Real DeepSeek API key for trusted installed-wheel pull-request tests.
@@ -40,6 +45,11 @@ on:
         type: string
         required: false
         default: ''
+      real_api:
+        description: Run the installed-wheel live API smoke and require its secret.
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   # Keep the called workflow distinct from its caller's concurrency group;
@@ -64,7 +74,8 @@ jobs:
     name: plan targets
     if: inputs.ci || inputs.release || github.event_name == 'workflow_dispatch'
     runs-on: >-
-      ${{ inputs.ci && !inputs.release && vars.DSH_CI_FAILOVER_LINUX == 'blacksmith'
+      ${{ github.repository_owner != 'deepseek-ai' && 'ubuntu-latest'
+          || inputs.ci && !inputs.release && vars.DSH_CI_FAILOVER_LINUX == 'blacksmith'
           && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -126,7 +137,8 @@ jobs:
     needs: plan
     name: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
     runs-on: >-
-      ${{ inputs.ci && !inputs.release && vars.DSH_CI_FAILOVER_LINUX == 'blacksmith'
+      ${{ github.repository_owner != 'deepseek-ai' && 'ubuntu-latest'
+          || inputs.ci && !inputs.release && vars.DSH_CI_FAILOVER_LINUX == 'blacksmith'
           && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
@@ -156,7 +168,8 @@ jobs:
     needs: [plan, sdk-wheel]
     name: ${{ matrix.target }}
     runs-on: >-
-      ${{ inputs.ci && !inputs.release && matrix.target == 'node24-linux-x64'
+      ${{ github.repository_owner != 'deepseek-ai' && matrix.runner
+          || inputs.ci && !inputs.release && matrix.target == 'node24-linux-x64'
           && vars.DSH_CI_FAILOVER_LINUX == 'blacksmith' && 'blacksmith-16vcpu-ubuntu-2404'
           || inputs.ci && !inputs.release && matrix.target == 'node24-win-x64'
           && vars.DSH_CI_FAILOVER_WINDOWS == 'blacksmith' && 'blacksmith-16vcpu-windows-2025'
@@ -372,7 +385,7 @@ jobs:
 
       - name: Preflight installed-wheel real API test (POSIX)
         if: >-
-          inputs.ci
+          inputs.real_api
           && runner.os != 'Windows'
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
@@ -388,7 +401,7 @@ jobs:
 
       - name: Preflight installed-wheel real API test (Windows)
         if: >-
-          inputs.ci
+          inputs.real_api
           && runner.os == 'Windows'
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
@@ -403,7 +416,7 @@ jobs:
 
       - name: Run installed-wheel real API black-box test (POSIX)
         if: >-
-          inputs.ci
+          inputs.real_api
           && runner.os != 'Windows'
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
@@ -423,7 +436,7 @@ jobs:
 
       - name: Run installed-wheel real API black-box test (Windows)
         if: >-
-          inputs.ci
+          inputs.real_api
           && runner.os == 'Windows'
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
