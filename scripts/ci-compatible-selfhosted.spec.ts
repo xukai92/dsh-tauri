@@ -38,11 +38,19 @@ function evaluate(expression: string, context: Record<string, unknown>): unknown
   }, { timeout: 1000 }) as unknown
 }
 
-function route(options: { mode?: string; author?: string; repository?: string; fork?: boolean; actor?: string } = {}): unknown {
+function route(options: {
+  mode?: string
+  author?: string
+  repository?: string
+  owner?: string
+  fork?: boolean
+  actor?: string
+} = {}): unknown {
   return evaluate(job['runs-on'], {
     vars: { DSH_CI_FAILOVER_LINUX: options.mode ?? 'selfhosted' },
     github: {
       repository: 'deepseek-harness/deepseek-harness',
+      repository_owner: options.owner ?? 'deepseek-ai',
       actor: options.actor ?? 'maintainer',
       event: { pull_request: {
         user: { login: options.author ?? 'maintainer' },
@@ -65,6 +73,10 @@ describe('Node compatibility self-hosted routing', () => {
     expect(route({ repository: 'outsider/fork', fork: false })).toBe('ubuntu-latest')
     expect(route({ fork: true })).toBe('ubuntu-latest')
     expect(route({ repository: '' })).toBe('ubuntu-latest')
+    expect(route({ owner: 'xukai92' })).toBe('ubuntu-latest')
+    for (const mode of ['', 'selfhosted', 'blacksmith']) {
+      expect(route({ owner: 'xukai92', mode })).toBe('ubuntu-latest')
+    }
   })
 
   it('preserves all three required version jobs and their concurrency', () => {

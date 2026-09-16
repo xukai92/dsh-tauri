@@ -195,8 +195,25 @@ describe('ui-settings-models apply', () => {
     expect(() => b.locale.register('settings.models', 'en', {})).not.toThrow()
   })
 
-  it('keeps remote-browser acknowledgement in process memory', async () => {
-    const b = await bench(false)
+  it('persists remote-browser acknowledgement through shared settings', async () => {
+    const mock = RemoteMock.create().load(remoteDefaultResponses)
+    const namespace = {
+      ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
+      schema: {},
+      value: {},
+      applies: 'live' as const,
+      secrets: [],
+      revision: 3,
+    }
+    mock.remote.settings.describe.mockResolvedValue(ok({
+      writable: true, hasDocument: true, namespaces: [namespace],
+    }))
+    mock.remote.settings.mutate.mockResolvedValue(ok({
+      ...namespace,
+      value: { [WELCOME_NOTICE_ACK_FIELD]: WELCOME_NOTICE_VERSION },
+      revision: 4,
+    }))
+    const b = await bench(false, mock)
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')
@@ -208,6 +225,15 @@ describe('ui-settings-models apply', () => {
     await injected.controller.load()
     expect(injected.controller.store.getSnapshot()).toEqual({
       status: 'ready', acknowledged: false, error: null,
+    })
+    await expect(injected.controller.acknowledge()).resolves.toBe(true)
+    expect(mock.remote.settings.mutate).toHaveBeenCalledWith(
+      WELCOME_NOTICE_SETTINGS_NAMESPACE,
+      [{ op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION }],
+      3,
+    )
+    expect(injected.controller.store.getSnapshot()).toEqual({
+      status: 'ready', acknowledged: true, error: null,
     })
   })
 })

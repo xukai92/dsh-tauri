@@ -9,6 +9,7 @@ import {
   checkDshFamilyVersion,
   checkExperimentalDependencyIsolation,
   checkExperimentalManifest,
+  checkWorkspaceManifest,
   expectedDshPackageFiles,
   type WorkspaceManifest,
 } from './check-workspace-constraints.ts'
@@ -142,6 +143,24 @@ describe('dsh family version coherence', () => {
       '0.1.2-rc.1',
     )).toBeUndefined()
     expect(checkDshFamilyVersion({ version: '0.1.2-alpha.5' }, '0.1.2-rc.1')).toBeUndefined()
+  })
+})
+
+describe('private application packaging', () => {
+  it('keeps the Tauri application private while requiring the shared tooling version', () => {
+    expect(checkWorkspaceManifest({
+      dir: 'apps/tauri',
+      manifest: { name: '@deepseek-ai/dsh-tauri', version: '0.1.6-alpha.1', private: true },
+    })).toEqual([])
+  })
+
+  it('does not exempt an arbitrary private application from publication policy', () => {
+    const errors = checkWorkspaceManifest({
+      dir: 'apps/private-example',
+      manifest: { name: '@deepseek-ai/private-example', private: true },
+    })
+    expect(errors).toContain('apps/private-example/package.json: @deepseek-ai/private-example: release member must not set "private": true')
+    expect(errors).toContain('apps/private-example/package.json: @deepseek-ai/private-example: app package has no publication files policy')
   })
 })
 

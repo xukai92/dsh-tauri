@@ -146,6 +146,34 @@ let desktopSpawnError: Error | undefined
 let output = ''
 let detachedPid: string | undefined
 
+type ProcessOutcome =
+  | { kind: 'error'; error: Error }
+  | { kind: 'exit'; code: number | null; signal: NodeJS.Signals | null }
+
+function observeOutcome(process: ChildProcess): Promise<ProcessOutcome> {
+  return new Promise((resolveOutcome) => {
+    process.once('error', (error) => { resolveOutcome({ kind: 'error', error }) })
+    process.once('exit', (code, signal) => { resolveOutcome({ kind: 'exit', code, signal }) })
+  })
+}
+
+function captureProcessOutput(process: ChildProcess): () => string {
+  const chunks: Buffer[] = []
+  let byteCount = 0
+  const append = (chunk: Buffer): void => {
+    byteCount += chunk.length
+    if (byteCount <= 1024 * 1024) chunks.push(chunk)
+  }
+  process.stdout?.on('data', append)
+  process.stderr?.on('data', append)
+  return () => Buffer.concat(chunks).toString('utf8')
+}
+
+function describeOutcome(outcome: ProcessOutcome, captured: string): string {
+  if (outcome.kind === 'error') return `failed to start: ${outcome.error.stack ?? outcome.error.message}`
+  return `exited with code ${String(outcome.code)}, signal ${String(outcome.signal)}${captured === '' ? '' : `:\n${captured}`}`
+}
+
 async function prepareSourcePreset(): Promise<string> {
   if (!values['source-cli']) return 'minimal'
   const shellPath = await findOnPath('bash')
@@ -358,7 +386,7 @@ async function capture(command: string, args: string[], timeoutMs = 5_000): Prom
   }
   captured.stdout.on('data', append)
   captured.stderr.on('data', append)
-  const code = await new Promise<number | null>((resolveExit, reject) => {
+  const outcome = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit, reject) => {
     const timer = setTimeout(() => {
       captured.kill('SIGKILL')
       reject(new Error(`${command} ${args.join(' ')} timed out after ${timeoutMs}ms`))
@@ -367,21 +395,25 @@ async function capture(command: string, args: string[], timeoutMs = 5_000): Prom
       clearTimeout(timer)
       reject(new Error(`failed to start ${command}`, { cause: error }))
     })
-    captured.once('exit', (exitCode) => {
+    captured.once('exit', (code, signal) => {
       clearTimeout(timer)
-      resolveExit(exitCode)
+      resolveExit({ code, signal })
     })
   })
-  if (code !== 0) throw new Error(`${command} ${args.join(' ')} exited ${code}: ${Buffer.concat(chunks).toString('utf8')}`)
+  if (outcome.code !== 0 || outcome.signal !== null) {
+    throw new Error(`${command} ${args.join(' ')} exited with code ${String(outcome.code)}, signal ${String(outcome.signal)}: ${Buffer.concat(chunks).toString('utf8')}`)
+  }
   return Buffer.concat(chunks).toString('utf8')
 }
 
-async function waitForDesktopHost(appProcess: ChildProcess): Promise<{ pid: number; url: string }> {
+async function waitForDesktopHost(appProcess: ChildProcess, capturedOutput: () => string): Promise<{ pid: number; url: string }> {
   if (appProcess.pid === undefined) throw new Error('desktop app has no pid')
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
     if (desktopSpawnError !== undefined) throw new Error('failed to start desktop app', { cause: desktopSpawnError })
-    if (appProcess.exitCode !== null) throw new Error(`desktop app exited during startup (${appProcess.exitCode})`)
+    if (appProcess.exitCode !== null || appProcess.signalCode !== null) {
+      throw new Error(`desktop app exited during startup with code ${String(appProcess.exitCode)}, signal ${String(appProcess.signalCode)}:\n${capturedOutput()}`)
+    }
     const table = await capture('ps', ['-axo', 'pid=,ppid=,comm='])
     const childLine = table.split('\n').find((line) => {
       const fields = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line)
@@ -400,7 +432,7 @@ async function waitForDesktopHost(appProcess: ChildProcess): Promise<{ pid: numb
     }
     await new Promise(resolveDelay => setTimeout(resolveDelay, 250))
   }
-  throw new Error('desktop app did not start a listening dsh-web child')
+  throw new Error(`desktop app did not start a listening dsh-web child:\n${capturedOutput()}`)
 }
 
 async function waitForPidExit(pid: number, label: string): Promise<void> {
@@ -455,6 +487,7 @@ async function stopPid(pid: number): Promise<void> {
   }
 }
 
+let primaryFailure: unknown
 try {
   const agentPreset = await prepareSourcePreset()
   const command = sidecar ?? process.execPath
@@ -590,45 +623,69 @@ try {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     desktop = desktopProcess
+    const desktopOutcome = observeOutcome(desktopProcess)
+    const desktopOutput = captureProcessOutput(desktopProcess)
     desktopProcess.once('error', (error) => { desktopSpawnError = error })
-    desktopProcess.stdout.resume()
-    desktopProcess.stderr.resume()
-    const host = await waitForDesktopHost(desktopProcess)
+    console.log(`tauri desktop quit smoke: spawned app pid ${String(desktopProcess.pid)}`)
+    const host = await waitForDesktopHost(desktopProcess, desktopOutput)
     desktopHostPid = host.pid
-    const desktopExited = desktopProcess.exitCode !== null
-      ? Promise.reject(new Error(`desktop app exited with ${desktopProcess.exitCode}`))
-      : new Promise<void>((resolveExit, reject) => {
-        desktopProcess.once('error', (error) => {
-          reject(new Error('desktop app failed after startup', { cause: error }))
-        })
-        desktopProcess.once('exit', (code) => {
-          if (code === 0) resolveExit()
-          else reject(new Error(`desktop app exited with ${code}`))
-        })
-      })
-    await capture('osascript', ['-e', 'tell application id "ai.deepseek.harness" to quit'])
-    await Promise.race([
-      desktopExited,
+    console.log(`tauri desktop quit smoke: host ready appPid=${String(desktopProcess.pid)} childPid=${host.pid} url=${host.url}`)
+    try {
+      await capture('osascript', ['-e', 'tell application id "ai.deepseek.harness" to quit'])
+    } catch (error) {
+      throw new Error(
+        `normal Quit request failed; desktop code=${String(desktopProcess.exitCode)}, signal=${String(desktopProcess.signalCode)}:\n${desktopOutput()}`,
+        { cause: error },
+      )
+    }
+    const outcome = await Promise.race([
+      desktopOutcome,
       new Promise<never>((_resolve, reject) => {
         setTimeout(() => { reject(new Error('desktop app ignored normal Quit')) }, 10_000)
       }),
     ])
+    if (outcome.kind === 'error' || outcome.code !== 0 || outcome.signal !== null) {
+      throw new Error(`desktop app ${describeOutcome(outcome, desktopOutput())}`)
+    }
     await waitForPidExit(host.pid, 'desktop dsh-web child')
     console.log(`tauri desktop quit smoke: app exited and stopped child ${host.pid} from ${host.url}`)
   }
+} catch (error) {
+  primaryFailure = error
 } finally {
-  if (child !== undefined) await stopChild(child, 'sidecar')
-  if (desktop !== undefined) await stopChild(desktop, 'desktop app')
-  if (desktopHostPid !== undefined) await stopPid(desktopHostPid)
-  if (detachedPid !== undefined) {
+  const cleanupFailures: unknown[] = []
+  const cleanup = async (action: () => void | Promise<void>): Promise<void> => {
     try {
-      process.kill(Number(detachedPid), 'SIGTERM')
+      await action()
+    } catch (error) {
+      cleanupFailures.push(error)
+    }
+  }
+  const sidecarProcess = child
+  const desktopProcess = desktop
+  const hostPid = desktopHostPid
+  const ptyPid = detachedPid
+  if (sidecarProcess !== undefined) await cleanup(async () => { await stopChild(sidecarProcess, 'sidecar') })
+  if (desktopProcess !== undefined) await cleanup(async () => { await stopChild(desktopProcess, 'desktop app') })
+  if (hostPid !== undefined) await cleanup(async () => { await stopPid(hostPid) })
+  if (ptyPid !== undefined) await cleanup(() => {
+    try {
+      process.kill(Number(ptyPid), 'SIGTERM')
     } catch (error) {
       if (!isMissingProcess(error)) throw error
     }
+  })
+  await cleanup(async () => {
+    await new Promise<void>((resolveClose) => { provider.close(() => { resolveClose() }) })
+  })
+  await cleanup(async () => { await rm(world, { recursive: true, force: true }) })
+  if (primaryFailure !== undefined) {
+    if (cleanupFailures.length > 0) console.error('tauri smoke cleanup failures:', ...cleanupFailures)
+    throw primaryFailure instanceof Error
+      ? primaryFailure
+      : new Error('tauri smoke failed with a non-Error value', { cause: primaryFailure })
   }
-  await new Promise<void>((resolveClose) => { provider.close(() => { resolveClose() }) })
-  await rm(world, { recursive: true, force: true })
+  if (cleanupFailures.length > 0) throw new AggregateError(cleanupFailures, 'tauri smoke cleanup failed')
 }
 
 function isMissingProcess(error: unknown): boolean {

@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.6-alpha.1",
   "description": "Tauri macOS desktop shell over the DeepSeek Harness Web GUI (dsh --profile web)",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "tauri": "tauri",
