@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-tauri-thin-web-shell.md
-2026-09-15-tauri-thin-web-shell.md: 09cefff4bddb48c7b49c3f3f002ace70437da433
-2026-09-15-tauri-thin-web-shell.zh.md: 935d2c77fdb81071dc68883a4526fd00ca069eb7
+2026-09-15-tauri-thin-web-shell.md: 86993112a93a192e9cfb3508c305c673150318b8
+2026-09-15-tauri-thin-web-shell.zh.md: 4e4f582c51b072b070ac7c5c4373fd0183068375

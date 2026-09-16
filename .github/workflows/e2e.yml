@@ -6,7 +6,7 @@ name: E2E (real DeepSeek API)
 # https://api.deepseek.com/anthropic (DEEPSEEK_BASE_URL is pinned explicitly so a
 # stray repo-root .env can't redirect the run).
 #
-# pull_request IS a trigger, but GitHub withholds repo secrets from BOTH forked
+# pull_request IS an upstream trigger, but GitHub withholds repo secrets from BOTH forked
 # PRs and Dependabot PRs (the latter are same-repo, fork==false, but still
 # keyless). The job-level `if:` below skips the whole job for those untrusted
 # PRs. The Dependabot test keys on the PR AUTHOR (pull_request.user.login), not
@@ -25,8 +25,9 @@ name: E2E (real DeepSeek API)
 # The fork/secret model and its public-repo implications are recorded in
 # .agents/notes/implemented/testing/2026-06-19-real-api-e2e-ci.md.
 #
-# Note: scheduled triggers are auto-disabled after 60 days of repo inactivity;
-# push/pull_request/workflow_dispatch act as backstops.
+# Upstream runs trusted PR, push, and nightly events. Downstream repositories
+# run only explicit workflow_dispatch requests.
+# Scheduled triggers are auto-disabled after 60 days of repo inactivity.
 on:
   workflow_dispatch:
   push:
@@ -54,14 +55,17 @@ env:
 jobs:
   e2e:
     runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'blacksmith'
+      ${{ github.repository_owner != 'deepseek-ai' && 'ubuntu-latest'
+          || vars.DSH_CI_FAILOVER_LINUX == 'blacksmith'
           && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     name: e2e
-    # Run on every trusted event. Skip untrusted PRs (forks + Dependabot) where
-    # the secret is withheld — they would otherwise hard-fail the preflight.
+    # Upstream runs every trusted event and skips untrusted PRs where GitHub
+    # withholds the secret. Downstream runs only explicit manual dispatches.
     if: >-
-      github.event_name != 'pull_request'
-      || !(github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]')
+      github.event_name == 'workflow_dispatch'
+      || github.repository_owner == 'deepseek-ai'
+      && (github.event_name != 'pull_request'
+          || !(github.event.pull_request.head.repo.fork || github.event.pull_request.user.login == 'dependabot[bot]'))
     # Profile e2e files can each own several complete dsh subprocess trees, so
     # four file workers preserve process/PTY headroom. Tests retain 120s/test
     # and retry 2; 45m still bounds retry storms against a slow API.
