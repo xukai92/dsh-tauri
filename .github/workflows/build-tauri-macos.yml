@@ -103,7 +103,7 @@ jobs:
           node --import tsx/esm scripts/smoke-tauri-bundle.ts --app "${apps[0]}"
 
       - name: Upload macOS bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dsh-tauri-macos-aarch64
           path: |
