@@ -1,5 +1,6 @@
 /** Experimental-package publication and dependency constraints. */
 
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -14,6 +15,10 @@ import {
   expectedDshPackageFiles,
   type WorkspaceManifest,
 } from './check-workspace-constraints.ts'
+
+const { version: repositoryVersion } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as { version: string }
 
 const experimental = {
   dir: 'packages/experimental/prototype',
@@ -151,7 +156,7 @@ describe('private application packaging', () => {
   it('keeps the Tauri application private while requiring the shared tooling version', () => {
     expect(checkWorkspaceManifest({
       dir: 'apps/tauri',
-      manifest: { name: '@deepseek-ai/dsh-tauri', version: '0.1.6-alpha.1', private: true },
+      manifest: { name: '@deepseek-ai/dsh-tauri', version: repositoryVersion, private: true },
     })).toEqual([])
   })
 
