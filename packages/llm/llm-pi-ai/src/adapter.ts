@@ -201,14 +201,40 @@ function reasoningInfo(
   }
 }
 
-/** Merge deployment headers while removing case-insensitive attribution collisions. */
-function requestHeaders(headers: Readonly<Record<string, string>> | undefined): Record<string, string> {
+/**
+ * The per-conversation routing header OpenCode's gateways require on inference
+ * requests. pi-ai does not send it yet (earendil-works/pi#9326), so the adapter
+ * supplies it for the OpenCode routes until an upgraded pi-ai owns it.
+ */
+const OPENCODE_SESSION_HEADER = 'x-opencode-session'
+
+/** Whether one route is served by an OpenCode gateway (`opencode`, `opencode-go`). */
+function isOpenCodeRoute(provider: string): boolean {
+  return provider === 'opencode' || provider.startsWith('opencode-')
+}
+
+/**
+ * Merge deployment headers while removing case-insensitive attribution
+ * collisions, then stamp the per-conversation routing id an OpenCode route
+ * requires. The id is request-scoped, so it wins over a same-named static
+ * entry: a fixed value would collapse every conversation onto one routing and
+ * prompt-cache bucket.
+ */
+function requestHeaders(
+  headers: Readonly<Record<string, string>> | undefined,
+  model: Model<Api>,
+  sessionId: GenerateOptions['sessionId'],
+): Record<string, string> {
   const attribution = attributionHeaders()
   const reserved = new Set(Object.keys(attribution).map(name => name.toLowerCase()))
-  return {
+  const merged: Record<string, string> = {
     ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
     ...attribution,
   }
+  if (sessionId !== undefined && isOpenCodeRoute(model.provider)) {
+    merged[OPENCODE_SESSION_HEADER] = String(sessionId)
+  }
+  return merged
 }
 
 /**
@@ -385,7 +411,7 @@ export class PiAiAdapter extends LlmAdapter {
         signal: watchdog.signal,
         // Profile headers are deployment-owned; attribution names are
         // Harness-owned and therefore win collisions.
-        headers: requestHeaders(profile.headers),
+        headers: requestHeaders(profile.headers, model, options.sessionId),
       })
       const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
       let exhausted = false
