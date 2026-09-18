@@ -10,7 +10,7 @@ DeepSeek Harness Web GUI 的原生 macOS 桌面 shell。它是现有 web profile
 
 1. `run()` 以 `--profile web --port 0 --no-open` 启动打包的 `dsh-web` sidecar。`scripts/build-tauri-sidecar.ts` 把维护中的 Python SDK runtime 可执行文件复制为 Tauri `externalBin` 所需的名称；`--port 0` 让操作系统选择空闲端口，因此两个 shell 不会冲突。当相邻的打包 sidecar 不存在时，`DSH_BIN` 会先于 `PATH` fallback 提供开发二进制文件。
 2. worker thread 读取宿主的 stdout，直到找到就绪行 `dsh web: http://127.0.0.1:<port>`，然后保留其完整 URL，包括可能存在的认证 query。
-3. `WebviewWindowBuilder` 在该外部 URL 上打开窗口 `main`。
+3. `WebviewWindowBuilder` 在该外部 URL 上打开内容窗口。切换到其他宿主时，会用新 URL 上的新窗口替换该窗口，而不是在当前页面上导航：当导航源于其他站点时，WebKit 会拒绝宿主 token 重定向期间设置的 `SameSite=Strict` session cookie，因此复用窗口会在完成 token 交换后仍处于未认证状态。
 4. 子进程保存在 Tauri 托管状态中。应用正常退出时会明确给予宿主六秒来释放 PTY 和已分离的工具进程，然后终止仍然存在的宿主进程组。
 
 监督器和 URL 解析器（含单元测试）见 `src-tauri/src/dsh.rs`，连线见 `src-tauri/src/lib.rs`。

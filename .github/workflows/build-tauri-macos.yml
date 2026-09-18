@@ -80,6 +80,10 @@ jobs:
       - name: Build the dsh web sidecar
         run: pnpm exec tsx scripts/build-tauri-sidecar.ts --targets node24-macos-arm64
 
+      - name: Test the Tauri crate
+        working-directory: apps/tauri/src-tauri
+        run: cargo test --lib
+
       - name: Build the Tauri app
         working-directory: apps/tauri
         run: pnpm --config.verify-deps-before-run=false tauri build

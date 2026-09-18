@@ -10,7 +10,7 @@ The entire GUI is dsh's own frontend — this crate is only the window and the p
 
 1. `run()` spawns the bundled `dsh-web` sidecar — the maintained Python SDK runtime executable copied into Tauri's `externalBin` naming by `scripts/build-tauri-sidecar.ts` — with `--profile web --port 0 --no-open` (`--port 0` lets the OS pick a free port so two shells never collide). When no adjacent bundled sidecar exists, `DSH_BIN` supplies the development binary before the `PATH` fallback.
 2. A worker thread reads the host's stdout until it finds the readiness line `dsh web: http://127.0.0.1:<port>`, then preserves its complete URL, including any authentication query.
-3. A `WebviewWindowBuilder` opens window `main` on that external URL.
+3. A `WebviewWindowBuilder` opens the content window on that external URL. Switching to another host replaces the window with a fresh one on the new URL instead of navigating the current page: WebKit withholds the `SameSite=Strict` session cookie set by the host's token redirect when the navigation began on a different site, so a reused window would exchange the token and then land unauthenticated.
 4. The child process is held in Tauri managed state. A normal application exit explicitly gives the host six seconds to dispose its PTYs and detached tool processes, then kills the remaining host process group.
 
 See `src-tauri/src/dsh.rs` for the supervisor and URL parser (with unit tests), and `src-tauri/src/lib.rs` for the wiring.

@@ -12,6 +12,8 @@ Tauri 分发需要提供原生 macOS 窗口，同时不能建立另一套后端 
 
 `apps/tauri` 是已交付 `dsh web` 应用之上的轻量窗口与进程监督器。它以隔离端口且禁用浏览器打开的方式启动相邻 `dsh-web` 可执行文件，保留完整的认证就绪 URL，并在系统 webview 中加载该 URL。远程模式加载显式 HTTP 或 HTTPS URL而不启动本地 Host。Tauri IPC 不会重复实现 Web Fetch、RPC 或 stream 协议。
 
+每次连接都会新建内容窗口并销毁上一个窗口，而不是在现有 webview 中导航。当导航源于其他站点时，WebKit 会拒绝重定向期间设置的 `SameSite=Strict` cookie；从已加载的本地 GUI 导航到远程 Host 会在完成 token 交换后收到未认证响应。新窗口执行的是浏览器直接打开该 URL 时的同一种首次导航。内容窗口 label 在 `main*` capability glob 下轮换。
+
 `scripts/build-tauri-sidecar.ts` 把可执行文件构建委托给 `scripts/build-exe-for-python-sdk.ts`。适配器把维护中的 runtime 可执行文件、macOS node-pty spawn helper 和 ripgrep companion 复制为 Tauri 所需的带 target 后缀的 `externalBin` 名称。因此 Tauri 路径与 Python runtime 共用闭包、bootstrap、原生资源处理、根目录固定并打补丁的 `@yao-pkg/pkg` 以及打包后的 ripgrep 选择。它不拥有仅供依赖使用的闭包或 sharp 资源布局。
 
 Rust 监督器创建一个进程组，转发 `SIGTERM`，等待六秒让 CLI 完成有界释放，然后在该组仍然存在时终止它。CLI 的正常释放负责已分离子进程组和 PTY session；升级终止只保证监督器拥有的进程组。`RunEvent::Exit` 会显式移除托管的 Host 状态，因为 Tauri 可能在 run callback 后终止进程而不保证销毁 Rust 托管状态。
@@ -24,7 +26,7 @@ Rust 监督器创建一个进程组，转发 `SIGTERM`，等待六秒让 CLI 完
 
 Linux 直接用 `rustc` 运行监督器测试，覆盖正常进程组关闭、leader 退出和有界升级终止。源码驱动器在隔离的 Harness、Agent、凭据和 workspace 状态以及无密钥本地 Messages provider 上启动真实 CLI。它要求认证 HTTP/RPC、设置持久化、带标准化 WebP 元数据的完整图像轮次、持久 PTY 输出、关闭前仍存活的后台后代以及真实 ripgrep 匹配。
 
-macOS workflow 通过已签名 `.app` 的资源重复这些观察，盘点主可执行文件和两个原生 companion，并验证代码签名。它还会启动真实应用并观察其返回未认证状态的回环监听器，等待 AppKit 报告所生成的精确进程已经完成启动，再通过该进程身份请求正常终止，并要求应用和 Host 子进程都退出。
+macOS workflow 通过已签名 `.app` 的资源重复这些观察，盘点主可执行文件和两个原生 companion，并验证代码签名。它还会启动真实应用并观察其返回未认证状态的回环监听器，等待 AppKit 报告所生成的精确进程已经完成启动，再通过该进程身份请求正常终止，并要求应用和 Host 子进程都退出。`cargo test` 覆盖远程连接 URL 校验；迫使内容窗口新建的重定向 cookie 行为只能在打包后的 macOS webview 中观察。
 
 ## Alternatives considered
 
